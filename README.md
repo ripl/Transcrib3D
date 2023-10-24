@@ -1,6 +1,6 @@
 # Transcribe3D
 
-This code repository is for internal testing only, please forgive its imperfections.
+This code repository is for internal testing only, please forgive some of its imperfections:)
 
 ## Install
 
