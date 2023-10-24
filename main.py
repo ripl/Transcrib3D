@@ -1480,7 +1480,7 @@ def main():
         formatted_time=args.ft
         print(formatted_time)
         for time in formatted_time:
-            refer3d.self_correction_dataset(result_folder_path=args.script_root+eval_config['result_folder_name'], formatted_time=time, line_number_list=np.arange(0,400)) if args.dataset=='scanrefer' else np.arange(0,400)
+            refer3d.self_correction_dataset(result_folder_path=args.script_root+eval_config['result_folder_name'], formatted_time=time, line_number_list=np.arange(0,400) if args.dataset=='scanrefer' else np.arange(2,400))
 
 
 

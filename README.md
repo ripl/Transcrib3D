@@ -6,6 +6,11 @@ This code repository is for internal testing only, please forgive its imperfecti
 
 For evaluation, only some simple packages were used, include *numpy*, *openai* and *tenacity*.
 
+## Data Prepare
+You should have a folder(let's call it *scannet_data_root*) that has ScanNet scene folders such as *scene0000_00* under it.
+
+Besides the original ScanNet data, object bounding boxes are also needed(ground truth, group free or mask3d). Currently these boxes are directly provided. [Download](https://drive.google.com/drive/folders/1A1nV66J-8NVExauugvlc7X5FM2QhQzeW?usp=drive_link) them and unzip under *scannet_data_root*, so that there will also be these 3 folders under *scannet_data_root*: objects_info, objects_info_gf and objects_info_mask3d_200c.
+
 ## File Structure
 
 ### main.py
@@ -45,3 +50,5 @@ You might run one or more experiments of a evaluation configuration, and get som
 Specify the formatted time(s) after the --ft setting:
 
 `python main.py --scannet_data_root /path/to/ScanNet/Data/ --script_root /path/to/Transcribe3D/project/folder --mode result --dataset nr3d --conf_idx 1 --ft time1 time2`
+
+## Self Correction
