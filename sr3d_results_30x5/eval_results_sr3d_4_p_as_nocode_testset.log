@@ -1,0 +1,23 @@
+Sr3d results for: ['eval_results_sr3d_4_p_as_nocode_testset/2023-09-16-20-12-59/2023-09-16-20-12-59.npy']
+total accuracy:
+86.67% (130/150)
+easy accuracy:
+89.69% (87/97)
+hard accuracy:
+81.13% (43/53)
+view_dep accuracy:
+63.89% (23/36)
+view_indep accuracy:
+93.86% (107/114)
+left_right accuracy:
+61.11% (11/18)
+horizontal accuracy:
+93.33% (28/30)
+vertical accuracy:
+93.33% (28/30)
+support accuracy:
+93.33% (28/30)
+between accuracy:
+96.67% (29/30)
+allocentric accuracy:
+56.67% (17/30)

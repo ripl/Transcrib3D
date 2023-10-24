@@ -1,0 +1,23 @@
+Nr3d results for: ['eval_results_sr3d_35_p_testset/2023-09-16-16-01-16/2023-09-16-16-01-16.npy']
+total accuracy:
+80.00% (112/140)
+easy accuracy:
+80.81% (80/99)
+hard accuracy:
+78.05% (32/41)
+view_dep accuracy:
+82.35% (14/17)
+view_indep accuracy:
+79.67% (98/123)
+left_right accuracy:
+100.00% (3/3)
+horizontal accuracy:
+82.46% (94/114)
+vertical accuracy:
+100.00% (2/2)
+support accuracy:
+40.00% (2/5)
+between accuracy:
+73.33% (11/15)
+allocentric accuracy:
+75.00% (3/4)
