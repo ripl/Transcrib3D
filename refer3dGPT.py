@@ -9,7 +9,7 @@ from code_interpreter import CodeInterpreter
 from gpt_dialogue import Dialogue
 from object_filter_gpt4 import ObjectFilter
 from prompt_text import get_principle, get_principle_sr3d, get_system_message
-from config import test_modes_nr3d,test_modes_sr3d,test_modes_scanrefer
+from config import confs_nr3d,confs_sr3d,confs_scanrefer
 from tenacity import (
     retry,
     before_sleep_log,
@@ -1396,188 +1396,90 @@ def random_sampling(lower, upper, mode, para):
     samples = random.sample(range(lower, upper + 1), num_samples)
     return samples
 
-#####################
-dataset_idx=2  # 0:nr3d, 1:sr3d, 2:scanrefer
-mode_idx=0   #<------
-#####################
+def parse_args():
+    import argparse
+    parser = argparse.ArgumentParser(description="Transcribe3D")
+
+    parser.add_argument("--scannet_data_root", type=str, help="Path of folder that contains scannet scene folders such as 'scene0000_00'.")
+    parser.add_argument("--script_root", type=str, help="Path of the Transcribe3D project folder.")
+    parser.add_argument("--mode", type=str, choices=["eval", "result"], help="Mode of operation     (eval or result)")
+    parser.add_argument("--dataset", type=str, choices=["nr3d","sr3d","scanrefer"], help="Choose the refering dataset. Requested for eval mode.")
+    parser.add_argument("--conf_idx", type=int, help="Configuration index in file config.py. Requested for eval mode.")
+    parser.add_argument("--range", type=tuple, help="Range of line numbers of the refering dataset(will be fed to np.arange()). For nr3d and sr3d, the minimum is 2. For scanrefer, the minimum is 0.")
+    parser.add_argument("--line_numbers", type=list, help="When the 'range' parameter is not provided, you can specify non-contiguous line numbers here.")
+    parser.add_argument("--ft", type=str, nargs='+', help="List of times in 'yy-mm-dd-HH-MM-SS' format. Requested for result mode.")
+
+    args = parser.parse_args()
+
+    return args
+
+def main():
+    args=parse_args()
+
+    if args.dataset=='nr3d':
+        eval_config=confs_nr3d[args.conf_idx]
+    elif args.dataset=='sr3d':
+        eval_config=confs_sr3d[args.conf_idx]
+    elif args.dataset=='scanrefer':
+        eval_config=confs_scanrefer[args.conf_idx]
+    else:
+        print("invalid dataset!")
+
+    print("test config:\n",eval_config)
+
+    openai_config = {
+            'model': eval_config['model'],
+            'temperature': 0,
+            'top_p': 0.0,
+            'max_tokens': 'inf',
+            'system_message': get_system_message() if eval_config['use_code_interpreter'] else '',
+            # 'load_path': '',
+            'save_path': 'chats',
+            'debug': True
+        }
+    
+    tool=eval_config.get('tool') # scanrefer detection tool
+    result_folder_name=eval_config['result_folder_name']
+
+    refer3d=Refer3d(scannet_data_root=args.scannet_data_root, 
+                    script_root=args.script_root,
+                    dataset=eval_config['dataset'], 
+                    refer_dataset_path=eval_config['refer_dataset_path'], 
+                    result_folder_name=result_folder_name,
+                    gpt_config=openai_config,
+                    use_gt_box=eval_config['use_gt_box'], 
+                    use_principle=eval_config['use_principle'],
+                    use_original_viewdep_judge=False,  
+                    scanrefer_tool_name=tool,
+                    use_priority=eval_config['use_priority'],
+                    use_code_interpreter=eval_config['use_code_interpreter']
+                    )
+
+    ###############################################################################
+    if args.mode=='eval':
+        line_number_range=np.arange(args.range) if args.range is not None else args.line_numbers
+        refer3d.evaluate_on_GPT(line_number_range, to_compress_prompt=True) #<---------
+    ###############################################################################
+
+    elif args.mode=='result':
+        """analyze results"""
+        formatted_time=args.ft
+        if isinstance(formatted_time,list):
+            print('is list')
+            result_path=["%s%s/%s.npy"%(result_folder_name,ft,ft) for ft in formatted_time]
+        else:
+            result_path="%s%s/%s.npy"%(result_folder_name,formatted_time,formatted_time) if formatted_time is not None else None
+        if result_path:
+            refer3d.analyse_result(result_path) 
+
+    """ScanRefer correction"""
+    # formatted_time="2023-09-11-18-11-35"
+    formatted_time=eval_config['formatted_time_list']
+    for ft in formatted_time:
+        refer3d.self_correction_dataset(result_folder_path="/share/data/ripl/vincenttann/sr3d/"+eval_config['result_folder_name'], formatted_time=ft, line_number_list=np.arange(0,400))
 
 
 
-if dataset_idx==0:
-    test_config=test_modes_nr3d[mode_idx]
-elif dataset_idx==1:
-    test_config=test_modes_sr3d[mode_idx]
-else:
-    test_config=test_modes_scanrefer[mode_idx]
 
-tool=test_config.get('tool') # scanrefer detection tool
-
-print("test config:\n",test_config)
-
-openai_config = {
-        'model': test_config['model'],
-
-        'temperature': 0,
-        'top_p': 0.0,
-        'max_tokens': 'inf',
-
-        'system_message': get_system_message() if test_config['use_code_interpreter'] else '',
-
-        # 'load_path': '',
-        'save_path': 'chats',
-        'debug': True
-    }
-
-
-"""Nr3d evaluation"""
-result_folder_name=test_config['result_folder_name']
-
-refer3d=Refer3d(scannet_data_root="/share/data/ripl/scannet_raw/", 
-                script_root="/share/data/ripl/vincenttann/sr3d/",
-                dataset=test_config['dataset'], 
-                refer_dataset_path=test_config['refer_dataset_path'], 
-                result_folder_name=result_folder_name,
-                gpt_config=openai_config,
-                use_gt_box=test_config['use_gt_box'], 
-                ########################################################################################
-                # object_filter_result_check_folder_name='eval_results_scanrefer_4_p_gf_valset', #<-------
-                ########################################################################################
-
-                # object_filter_result_check_list=['2023-09-15-15-14-28','2023-09-15-18-06-29','2023-09-15-17-13-51','2023-09-15-17-14-30'], #nr3d
-                # object_filter_result_check_list=['2023-09-15-23-51-36','2023-09-16-00-02-17','2023-09-16-00-30-09'], #scanrefer
-                use_principle=test_config['use_principle'],
-
-                ##############################################
-                use_original_viewdep_judge=False,  #<----------
-                ##############################################
-                scanrefer_tool_name=tool,
-                use_priority=test_config['use_priority'],
-                use_code_interpreter=test_config['use_code_interpreter']
-                )
-# refer3d.evaluate_on_GPT(np.arange(2,209))
-# refer3d.evaluate_on_GPT(find_number_list_in_failure_log(log_root+"2023-08-15-17-49-04-failure.log")[10:])
-
-###############################################################################
-line_number_range=np.arange(0,50)        #<---------------------------------
-# line_number_range=np.arange(100,200)+2    #<-----------------------------------
-# line_number_range=np.arange(265-2,300)+2    #<-----------------------------------
-# refer3d.evaluate_on_GPT(line_number_range, to_compress_prompt=True) #<---------
-###############################################################################
-
-"""Nr3d results"""
-# refer3d.analyse_result(refer3d.save_path)
-# refer3d.analyse_result(log_root+"2023-08-15-11-27-50.npy")
-# refer3d.analyse_result(log_root+"2023-08-15-17-15-05.npy")
-# refer3d.analyse_result(log_root+"2023-08-15-17-49-04.npy") #72% in 50
-# refer3d.analyse_result([log_root+"2023-08-16-15-19-12.npy",])
-# formatted_time=["2023-09-14-00-53-10","2023-09-14-00-53-43","2023-09-14-00-54-07"]
-# formatted_time="2023-09-15-01-15-42"
-# # formatted_time="2023-09-14-00-53-10"
-
-formatted_time=test_config['formatted_time_list']
-if isinstance(formatted_time,list):
-    print('is list')
-    result_path=["%s%s/%s.npy"%(result_folder_name,ft,ft) for ft in formatted_time]
-else:
-    result_path="%s%s/%s.npy"%(result_folder_name,formatted_time,formatted_time) if formatted_time is not None else None
-if result_path:
-    refer3d.analyse_result(result_path) 
-
-"""Nr3d correction"""
-# formatted_time="2023-09-14-00-53-10"
-# line_number_range=np.arange(0,300)+2
-# formatted_time="2023-09-14-00-53-43"
-# line_number_range=np.arange(300,600)+2
-# formatted_time="2023-09-14-00-54-07"
-# line_number_range=np.arange(600,1000)+2
-
-# refer3d.self_correction_dataset("/share/data/ripl/vincenttann/sr3d/"+result_folder_name,formatted_time,line_number_range)
-
-
-"""ScanRefer evaluation"""
-# of_result_check_list=["2023-09-11-18-11-35","2023-09-11-18-11-42","2023-09-11-18-12-14","2023-09-11-18-13-12"]
-# refer3d=Refer3d(scannet_data_root="/share/data/ripl/scannet_raw/", 
-#                 script_root="/share/data/ripl/vincenttann/sr3d/",
-#                 dataset="scanrefer", 
-#                 refer_dataset_path="/share/data/ripl/vincenttann/sr3d/data/scanrefer/ScanRefer_filtered_train_sampled1000.json",
-#                 gpt_config=config,
-#                 scanrefer_iou_thr=0.5,
-#                 use_gt_box=True,
-#                 object_filter_result_check_list=of_result_check_list)
-# result_folder_name="eval_results_scanrefer_2stages/"
-
-# # line_number_range=np.arange(84,100)
-# # line_number_range=np.arange(135,200)
-# # line_number_range=np.arange(235,300)
-# # line_number_range=np.arange(312,400)
-# # formatted_time=refer3d.evaluate_on_GPT(line_number_range, to_compress_prompt=True, result_folder_name=result_folder_name)
-
-"""ScanRefer results"""
-# formatted_time=["2023-09-11-18-11-35","2023-09-11-18-11-42","2023-09-11-18-12-14","2023-09-11-18-13-12"] #使用priority的400个实验，跑通了265个
-# # formatted_time=["2023-09-13-01-05-25","2023-09-13-01-05-36","2023-09-13-01-05-49","2023-09-13-01-05-59"]
-# formatted_time=["2023-09-13-01-05-25","2023-09-13-01-05-36","2023-09-13-01-05-49","2023-09-13-01-05-59","2023-09-13-14-38-48","2023-09-13-14-38-55","2023-09-13-14-38-59","2023-09-13-14-39-03"] # 不使用priority的400个实验，跑通了383个
-# # formatted_time=["2023-09-13-01-05-25","2023-09-13-01-05-36","2023-09-13-01-05-49","2023-09-13-01-05-59","2023-09-13-17-18-48","2023-09-13-17-19-05","2023-09-13-17-19-19","2023-09-13-17-19-33"] 
-# if isinstance(formatted_time,list):
-#     print('is list')
-#     result_path=["%s%s/%s.npy"%(result_folder_name,ft,ft) for ft in formatted_time]
-# else:
-#     result_path="%s%s/%s.npy"%(result_folder_name,formatted_time,formatted_time)
-
-# refer3d.analyse_result(result_path)
-# refer3d.check_scanrefer_answer_exist_percentage(0.5)
-
-
-"""ScanRefer correction"""
-# formatted_time="2023-09-11-18-11-35"
-formatted_time=test_config['formatted_time_list']
-for ft in formatted_time:
-    refer3d.self_correction_dataset(result_folder_path="/share/data/ripl/vincenttann/sr3d/"+test_config['result_folder_name'], formatted_time=ft, line_number_list=np.arange(0,400))
-
-
-
-# for sr3d
-# refer3d=Refer3d(scannet_data_root="/share/data/ripl/scannet_raw/", 
-#                 script_root="/share/data/ripl/vincenttann/sr3d/",
-#                 dataset="sr3d", 
-#                 refer_dataset_path="/share/data/ripl/vincenttann/sr3d/data/referit3d/sr3d_train_support.csv",
-#                 gpt_config=config)
-
-# log_root="/share/data/ripl/vincenttann/sr3d/eval_results/"
-
-# refer3d.evaluate_on_GPT(np.arange(2,330)) 
-# refer3d.evaluate_on_GPT(random_sampling(2,3007,'num',50)) #allo
-# refer3d.evaluate_on_GPT(random_sampling(2,1191,'num',50)) #support
-# refer3d.evaluate_on_GPT(random_sampling(2,2607,'num',50)) #vertical
-# refer3d.evaluate_on_GPT(random_sampling(2,53577,'num',50)) #horizontal
-# refer3d.evaluate_on_GPT(random_sampling(2,5467,'num',50)) #between
-
-# refer3d.analyse_result(refer3d.save_path)
-# refer3d.analyse_result(["./eval_results/2023-08-10-10-39-31.npy","./eval_results/2023-08-10-11-11-55.npy"]) #allo 50
-# refer3d.analyse_result("./eval_results/2023-08-10-12-42-46.npy") #support 50
-# refer3d.analyse_result("./eval_results/2023-08-10-16-29-30.npy") #vertical 50
-# refer3d.analyse_result("./eval_results/2023-08-10-18-54-29.npy") #allocentric 50 有左右向量
-# refer3d.analyse_result("./eval_results/2023-08-10-20-03-07.npy") #horizontal
-# refer3d.analyse_result("./eval_results/2023-08-11-00-00-16.npy") #between
-# refer3d.analyse_result("./eval_results/2023-08-11-12-28-11.npy") #vertical
-
-# refer3d.evaluate_on_GPT(find_number_list_in_log(log_root+"2023-08-11-12-28-11-progress.log")) # vertical 50 same data
-# refer3d.analyse_result(log_root+"2023-08-11-16-34-05.npy")
-
-# refer3d.evaluate_on_GPT(find_number_list_in_log(log_root+"2023-08-10-12-42-46-progress.log")) #support 50 same data
-# refer3d.analyse_result(log_root+"2023-08-11-17-39-47.npy")
-
-# refer3d.refer_dataset_path="/share/data/ripl/vincenttann/sr3d/data/referit3d/sr3d_train_between.csv"
-# refer3d.evaluate_on_GPT(find_number_list_in_log(log_root+"2023-08-11-00-00-16-progress.log")) #between 50 same data
-# refer3d.analyse_result(log_root+"2023-08-11-18-41-01.npy")
-
-# refer3d.refer_dataset_path="/share/data/ripl/vincenttann/sr3d/data/referit3d/sr3d_train_allocentric.csv"
-# refer3d.evaluate_on_GPT(find_number_list_in_log(log_root+"2023-08-10-18-54-29-progress.log")) #allocentric 50 same data
-# # refer3d.analyse_result(log_root+"2023-08-11-19-18-00.npy")
-# # refer3d.analyse_result(log_root+"2023-08-15-16-03-15.npy")
-# refer3d.analyse_result(log_root+"2023-08-15-16-41-19.npy")
-
-# refer3d.refer_dataset_path="/share/data/ripl/vincenttann/sr3d/data/referit3d/sr3d_train_horizontal.csv"
-# refer3d.evaluate_on_GPT(find_number_list_in_log(log_root+"2023-08-10-20-03-07-progress.log")) #horizontal 50 same data
-# refer3d.analyse_result(log_root+"2023-08-11-20-02-36.npy")
-
-
+if __name__=='__main__':
+    main()

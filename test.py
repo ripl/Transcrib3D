@@ -1,17 +1,14 @@
-import os
+import argparse
+parser = argparse.ArgumentParser(description="Description of your program")
 
-# 要重命名的文件夹路径
-folder_path = "./"
+# 添加--mode参数
+parser.add_argument("--mode", type=str, choices=["eval", "result"], help="Mode of operation (eval or result)")
+parser.add_argument("--times", type=str, nargs='+', help="List of times in 'yy-mm-dd-HH-MM-SS' format")
+# 还可以添加其他参数
+# parser.add_argument("--another_option", type=str, help="Description of another option")
 
-# 获取文件夹中的所有文件
-files = os.listdir(folder_path)
+# 解析命令行参数
+args = parser.parse_args()
 
-# 遍历文件并重命名
-for file_name in files:
-    if file_name.startswith("objects_info_mask3d_"):
-        new_name = file_name.replace("objects_info_mask3d_", "objects_info_mask3d_200c_")
-        # 拼接完整的文件路径
-        old_path = os.path.join(folder_path, file_name)
-        new_path = os.path.join(folder_path, new_name)
-        # 执行重命名
-        os.rename(old_path, new_path)
+print("mode:",args.mode)
+print("times:",args.times)

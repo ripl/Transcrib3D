@@ -1,5 +1,5 @@
 
-test_modes_nr3d={
+confs_nr3d={
     # nr3d
     0:{
         'dataset':'nr3d',
@@ -69,7 +69,7 @@ test_modes_nr3d={
     },
 }
 
-test_modes_sr3d={
+confs_sr3d={
     # sr3d
     0:{
         'dataset':'sr3d',
@@ -189,7 +189,7 @@ test_modes_sr3d={
     },
 }
 
-test_modes_scanrefer={
+confs_scanrefer={
     # scanrefer
     0:{
         'dataset':'scanrefer',
