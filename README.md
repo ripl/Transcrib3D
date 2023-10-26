@@ -6,10 +6,14 @@ This code repository is for internal testing only, please forgive some of its im
 
 For evaluation, only some simple packages were used, include *numpy*, *openai* and *tenacity*.
 
-## Data Prepare
-You should have a folder(let's call it *scannet_data_root*) that has ScanNet scene folders such as *scene0000_00* under it.
+## OpenAI API access
+Set up your OpenAI api key as an environment variable `OPENAI_API_KEY`.
 
-Besides the original ScanNet data, object bounding boxes are also needed(ground truth, group free or mask3d). Currently these boxes are directly provided. [Download](https://drive.google.com/drive/folders/1A1nV66J-8NVExauugvlc7X5FM2QhQzeW?usp=drive_link) them and unzip under *scannet_data_root*, so that there will also be these 3 folders under *scannet_data_root*: objects_info, objects_info_gf and objects_info_mask3d_200c.
+## Data Prepare
+~~You should have a folder(let's call it *scannet_data_root*) that has ScanNet scene folders such as *scene0000_00* under it.
+Besides the original ScanNet data, object bounding boxes are also needed(ground truth, group free or mask3d). Currently these boxes are directly provided. [Download](https://drive.google.com/drive/folders/1A1nV66J-8NVExauugvlc7X5FM2QhQzeW?usp=drive_link) them and unzip under *scannet_data_root*, so that there will also be these 3 folders under *scannet_data_root*: objects_info, objects_info_gf and objects_info_mask3d_200c.~~
+
+To make things easier, we provide the bounding boexes for each scene at `data/scannet_object_info`. Currently it only include ground truth bounding boxes (which is the setting for NR3D and SR3D from Referit3D benchmark), detected bounding boxes will be provided later. There is no need to prepare the original scannet scene data for the sole purpose of testing (original scene data are still useful for debugging and visualization).
 
 ## File Structure
 
@@ -36,16 +40,20 @@ Run the first 50 data records of *nr3d_test_sampled1000.csv* with config index 1
 
 Remember to replace the paths.
 
-For the scannet_data_root, there should be scannet scene folders under it, such as *scene0000_00*
+~~For the scannet_data_root, there should be scannet scene folders under it, such as *scene0000_00*~~
 
-If you are using TTIC slurm, the scannet_data_root should be */share/data/ripl/scannet_raw/train/*
+~~If you are using TTIC slurm, the scannet_data_root should be */share/data/ripl/scannet_raw/train/*.~~
+
+`scannet_data_root` can be set to `/path/to/Transcribe3D/project/folder/Transcribe3D/data/scannet_object_info` as we provide the GT scannet bounding boxes already.
 
 To run sr3d or scanrefer, simply modify the --dataset setting.
+
+We test the first 300 samples for NR3D and 140 samples for SR3D in our paper.
 
 After running the evaluation, a folder which has a name starting with 'eval_results_' and containing configuration infomation will be created. Under this folder, there will be subfolders named after time.
 
 ## Analyze Result
-You might run one or more experiments of a evaluation configuration, and get some subfolders named after formatted time. The time/times are used for analyze the results.
+You might run one or more experiments of a evaluation configuration, and get some subfolders named after formatted time. The time/times are used for analyze the results. An example timestamp looks like "2023-10-26-15-48-12".
 
 Specify the formatted time(s) after the --ft setting:
 
