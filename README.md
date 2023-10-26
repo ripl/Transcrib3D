@@ -44,7 +44,7 @@ Remember to replace the paths.
 
 ~~If you are using TTIC slurm, the scannet_data_root should be */share/data/ripl/scannet_raw/train/*.~~
 
-`scannet_data_root` can be set to `/path/to/Transcribe3D/project/folder/Transcribe3D/data/scannet_object_info` as we provide the GT scannet bounding boxes already.
+`scannet_data_root` can be set to `/path/to/Transcribe3D/project/folder/data/scannet_object_info` as we provide the GT scannet bounding boxes already.
 
 To run sr3d or scanrefer, simply modify the --dataset setting.
 
