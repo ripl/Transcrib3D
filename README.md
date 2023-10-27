@@ -57,7 +57,7 @@ You might run one or more experiments of a evaluation configuration, and get som
 
 Specify the formatted time(s) after the --ft setting:
 
-`python main.py --scannet_data_root /path/to/ScanNet/Data/ --script_root /path/to/Transcribe3D/project/folder --mode result --dataset nr3d --conf_idx 1 --ft time1 time2`
+`python main.py --scannet_data_root /path/to/ScanNet/Data/ --script_root /path/to/Transcribe3D/project/folder/ --mode result --dataset nr3d --conf_idx 1 --ft time1 time2`
 
 ## Self Correction
 This checks all the result dialogues given formatted time(s), self-corrects those wrong cases.
