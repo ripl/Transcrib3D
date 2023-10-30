@@ -1199,7 +1199,8 @@ class Refer3d:
         scannet_labels = type2class.keys()
         scannet2label = {label: i for i, label in enumerate(scannet_labels)} #从上述18个label映射到idx的字典
 
-        lines = [line.rstrip() for line in open("/share/data/ripl/vincenttann/sr3d/data/scannetv2-labels.combined.tsv")]
+        scannet_label_path = os.path.join(self.script_root, 'data', 'scannetv2-labels.combined.tsv')
+        lines = [line.rstrip() for line in open(scannet_label_path)]
         lines = lines[1:]
         raw2label = {}
         for i in range(len(lines)):
