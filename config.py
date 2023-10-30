@@ -61,6 +61,16 @@ confs_nr3d={
         'use_priority':False,
         'use_code_interpreter':True
     },
+    6:{
+        'dataset':'nr3d',
+        'model':'gpt-4', # nr3d gpt-4 train set
+        'result_folder_name':'eval_results_nr3d_4_p_trainset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/nr3d_train_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':True
+    },
 }
 
 confs_sr3d={
