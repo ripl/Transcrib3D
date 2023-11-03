@@ -1,2 +1,3 @@
-eval_results_*/
 __pycache__/
+.eval_results_*/
+.vscode/
