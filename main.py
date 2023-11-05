@@ -547,10 +547,10 @@ class Refer3d:
         # prompt中的要求
         line="Instruction:find the one described object in description: \n\"%s\"\n" %utterance
         prompt=prompt+line
-        if self.dataset=='sr3d':
-            prompt=prompt+get_principle_sr3d(utterance) if self.use_principle else prompt
-        else:
-            prompt=prompt+get_principle(utterance,self.use_priority) if self.use_principle else prompt
+        # if self.dataset=='sr3d':
+        #     prompt=prompt+get_principle_sr3d(utterance) if self.use_principle else prompt
+        # else:
+        #     prompt=prompt+get_principle(utterance,self.use_priority) if self.use_principle else prompt
         # if not self.dataset=='sr3d':
         #     # prompt=prompt+" Howerver, if the direction vector of A is not provided, you should use other information to identify the referred object instead of assuming a direction vector."
             
@@ -563,7 +563,7 @@ class Refer3d:
         # prompt=prompt+"\nIf the answewr is complete, add 'Now the answer is complete.' to the end of your answer."
         # prompt=prompt+"\n Then in the last line of your response, there should Only be a python dictionary in format: {'ID':id}, where id is the id of the referred object."
 
-        prompt=prompt+"\nIf the answer is complete, add \"Now the answer is complete -- {'ID':id}\" to the end of your answer(that is, your completion, not your code), where id is the id of the referred obj."
+        prompt=prompt+"\nIf the answer is complete, add \"Now the answer is complete -- {'ID':id}\" to the end of your answer(that is, your completion, not your code), where id is the id of the referred obj. Do not add anything after."
 
         # prompt=prompt+"\n Do not stop before you find the right id."
 
@@ -1431,12 +1431,20 @@ def main():
     print("test config:\n",eval_config)
     print("\n")
 
+    system_message = 'Imagine you are an artificial intelligence assistant. You job is to do 3D referring reasoning, namely to find the object for a given utterance from a 3d scene presented as object-centric semantic information.\n'
+    system_message += get_system_message() if eval_config['use_code_interpreter'] else ''
+    if args.dataset=='sr3d':
+        system_message += get_principle_sr3d() if eval_config['use_principle'] else ''
+    else:
+        system_message += get_principle(eval_config['use_priority']) if eval_config['use_principle'] else ''
+    # print('system message:\n',system_message)
+
     openai_config = {
             'model': eval_config['model'],
-            'temperature': 0,
-            'top_p': 0.0,
-            'max_tokens': 'inf',
-            'system_message': get_system_message() if eval_config['use_code_interpreter'] else '',
+            'temperature': 1e-7,
+            'top_p': 1e-7,
+            'max_tokens': 4096,
+            'system_message': system_message,
             # 'load_path': '',
             'save_path': 'chats',
             'debug': True

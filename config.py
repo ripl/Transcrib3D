@@ -71,6 +71,76 @@ confs_nr3d={
         'use_priority':False,
         'use_code_interpreter':True
     },
+    7:{
+        'dataset':'nr3d',
+        'model':'meta-llama/Llama-2-7b-chat-hf',
+        'result_folder_name':'eval_results_nr3d_llama2_7b_chat_p_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False
+    },
+    8:{
+        'dataset':'nr3d',
+        'model':'meta-llama/Llama-2-13b-chat-hf',
+        'result_folder_name':'eval_results_nr3d_llama2_13b_chat_p_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False
+    },
+    9:{
+        'dataset':'nr3d',
+        'model':'meta-llama/Llama-2-70b-chat-hf',
+        'result_folder_name':'eval_results_nr3d_llama2_70b_chat_p_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False
+    },
+    10:{
+        'dataset':'nr3d',
+        'model':'codellama/CodeLlama-7b-Instruct-hf',
+        'result_folder_name':'eval_results_nr3d_codellama_7b_instruct_p_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False
+    },
+    11:{
+        'dataset':'nr3d',
+        'model':'codellama/CodeLlama-13b-Instruct-hf',
+        'result_folder_name':'eval_results_nr3d_codellama_13b_instruct_p_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False
+    },
+    12:{
+        'dataset':'nr3d',
+        'model':'codellama/CodeLlama-34b-Instruct-hf',
+        'result_folder_name':'eval_results_nr3d_codellama_34b_instruct_p_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False
+    },
+    13:{
+        'dataset':'nr3d',
+        'model':'mistralai/Mistral-7B-Instruct-v0.1',
+        'result_folder_name':'eval_results_nr3d_mistralai_7b_instruct_p_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False
+    },
 }
 
 confs_sr3d={

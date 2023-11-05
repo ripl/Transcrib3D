@@ -4,8 +4,20 @@ import datetime
 import openai
 openai.api_key = os.getenv("OPENAI_API_KEY")
 # openai.api_key = "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"
+
+HUGGINGFACE_MODELS = {
+    'meta-llama/Llama-2-7b-chat-hf',
+    'meta-llama/Llama-2-13b-chat-hf',
+    'meta-llama/Llama-2-70b-chat-hf',
+    'codellama/CodeLlama-7b-Instruct-hf',
+    'codellama/CodeLlama-13b-Instruct-hf',
+    'codellama/CodeLlama-34b-Instruct-hf',
+    'mistralai/Mistral-7B-Instruct-v0.1',
+}
+
+
 class Dialogue:
-    def __init__(self, model='gpt-4', temperature=0, top_p=0.1, max_tokens=10, system_message='', load_path=None, save_path='chats', debug=False):
+    def __init__(self, model='gpt-4', temperature=0, top_p=0.0, max_tokens=10, system_message='', load_path=None, save_path='chats', debug=False):
         self.model = model
         self.temperature = temperature
         self.top_p = top_p
@@ -17,6 +29,16 @@ class Dialogue:
             self.load_pretext(load_path)
         else:
             self.pretext = [{"role": "system", "content": self.system_message}]
+
+        if self.model in HUGGINGFACE_MODELS:
+            from hf_conversational import HuggingfaceConversational
+            from transformers import Conversation
+            self.conversational = HuggingfaceConversational(
+                model_name=self.model,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                max_length=self.max_tokens
+            )
 
     def load_pretext(self, load_path):
 
@@ -70,18 +92,27 @@ class Dialogue:
 
     def call_openai(self, user_prompt):
         user_message = [{"role": "user", "content": user_prompt}]
-        completion = openai.ChatCompletion.create(
-            model=self.model,
-            messages=self.pretext + user_message,
-            temperature=self.temperature,
-            top_p=self.top_p,
-        )
-        # if self.debug:
-        #     print('completion: ', completion)
-        assistant_response = completion.choices[0].message
-        self.pretext = self.pretext + user_message + [assistant_response]
-        token_usage=completion.usage.total_tokens
-        return assistant_response, token_usage
+        messages = self.pretext + user_message
+        if self.model in ['gpt-4', 'gpt-3.5-turbo']:
+            completion = openai.ChatCompletion.create(
+                model=self.model,
+                messages=self.pretext + user_message,
+                temperature=self.temperature,
+                top_p=self.top_p,
+            )
+            # if self.debug:
+            #     print('completion: ', completion)
+            assistant_response_message = completion.choices[0].message
+            token_usage = completion.usage.total_tokens
+        elif self.model in HUGGINGFACE_MODELS:
+            assistant_response_message = self.conversational(messages).messages[-1]
+            token_usage = 0
+        else:
+            raise Exception('model name {} not supported'.format(self.model))
+        
+        self.pretext = self.pretext + user_message + [assistant_response_message]
+        
+        return assistant_response_message, token_usage
 
 
 if __name__ == '__main__':

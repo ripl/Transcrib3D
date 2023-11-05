@@ -1,4 +1,5 @@
-def get_principle(utterance, use_priority=False):
+# def get_principle(utterance, use_priority=False):
+def get_principle(use_priority=False):
     prompt = ''
     prompt = prompt + """Tips: while multiple objs may appear within the description, it points to only 1 focal object, with the other objects serving to aid in locating or contextualizing it. For instance, spatial relation with other objects might be employed to establish the position or orientation of this focal object. Examples:
     1.'The brown cabinet covers the entire back wall. There is a door with a blue sign located between the brown cabinet.' The first sentence is actually a noun phrase starting with 'the,' indicating that the focal object being described is 'the brown cabinet.' The second sentence describes the spatial relationship between the door and the brown cabinet, providing supplementary details about the described brown cabinet.
@@ -25,7 +26,7 @@ def get_principle(utterance, use_priority=False):
         - Direction relation 'left''right'(if given). To judge obj A on 'left' or 'right' of B, calc vector observer-A & observer-B(both projected to x-y plane). If cross product of vector observer-A & vector observer-B(in this order) has positive z, A on right of B. If z neg, A on left of B. Note that order of cross product matters, put vec observer-A at first. DON'T determine left & right relation by comparing x or y coords.
         - Direction relation 'in front of' and 'behind'(if given). Use 'spatially closer' to replace them. To determine which object, P1 or P2, is behind Q, calculate their distances from Q. The one with the smaller distance is behind Q. It is the same for judging 'in front of': also smaller distance. DON'T determine front & behind relation by comparing x or y coords.
         - Vertical relation such as 'on''above''under'(if given). If obj M has vertical relation with obj N, the x,y coord of ctr of M should be inside the x,y range of obj N, while z of M and z of N should satisfy the corresponding order.
-        After going through all constraints in the description, double check the description:'%s' , and evaluate all results and metrics comprehensively, then choose the unique target object.""" % utterance
+        After going through all constraints in the description, double check the given utterance , and evaluate all results and metrics comprehensively, then choose the unique target object."""
 
     prompt = prompt + "\nPerceive wall as plane. Distance from obj to wall=vert dist to plane, not to wall center. Wall front=side of plane where obj exist."
 
