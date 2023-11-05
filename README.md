@@ -63,3 +63,7 @@ Specify the formatted time(s) after the --ft setting:
 This checks all the result dialogues given formatted time(s), self-corrects those wrong cases.
 
 `python main.py --scannet_data_root /path/to/ScanNet/Data/ --script_root /path/to/Transcribe3D/project/folder --mode self_correct --dataset nr3d --conf_idx 1 --ft time1 time2`
+
+## Check Scanrefer
+Check the how many cases are provided with detected boxes that has 0.5 or higher iou with gt box, which indicates the upper bound of performance on Scanrefer.
+`python main.py --scannet_data_root /path/to/ScanNet/Data/ --script_root /path/to/Transcribe3D/project/folder --mode check_scanrefer --dataset scanrefer --conf_idx 1`

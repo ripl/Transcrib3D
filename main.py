@@ -275,16 +275,17 @@ class Refer3d:
         utterance=data['description']
         annotation_id=data['ann_id']
         suffix='_'+self.scanrefer_tool_name if self.scanrefer_tool_name else ''
-        npy_path_train=self.scannet_data_root + "/objects_info%s/objects_info%s_"%(suffix,suffix) + scan_id + ".npy" 
-        npy_path_test=self.scannet_data_root+"/test/objects_info%s/objects_info%s_"%(suffix,suffix) +scan_id + ".npy"
-        if os.path.exists(npy_path_train):
-            npy_path=npy_path_train
-        else:
-            npy_path=npy_path_test
+        npy_path_train=os.path.join(self.scannet_data_root, "objects_info%s/objects_info%s_"%(suffix,suffix) + scan_id + ".npy")
+        # npy_path_test=self.scannet_data_root+"/test/objects_info%s/objects_info%s_"%(suffix,suffix) +scan_id + ".npy"
+        # if os.path.exists(npy_path_train):
+        #     npy_path=npy_path_train
+        # else:
+        #     npy_path=npy_path_test
         # elif os.path.exists(npy_path_test):
         #     npy_path=npy_path_test
         # else:
         #     print("object_info.npy file does not exist!!! scan_id:",scan_id)
+        npy_path=npy_path_train
         objects_info=np.load(npy_path,allow_pickle=True)
         gt_box=self.get_scanrefer_gt_box(scan_id,target_id)
         iou_max=0.0
@@ -1219,12 +1220,12 @@ class Refer3d:
         # 本函数用于在结果npy文件没有记录scanrefer是否unique的情况下，找到这个信息
         # 读入事先准备好的物体信息，即npy文件
         # 做法参考了scanrefer的代码
-        npy_path_train=self.scannet_data_root+"/train/objects_info/objects_info_"+scan_id+".npy"
-        npy_path_test=self.scannet_data_root+"/test/objects_info/objects_info_"+scan_id+".npy"
+        npy_path_train=os.path.join(self.scannet_data_root,"objects_info","objects_info_"+scan_id+".npy")
+        # npy_path_test=self.scannet_data_root+"/test/objects_info/objects_info_"+scan_id+".npy"
         if os.path.exists(npy_path_train):
             npy_path=npy_path_train
-        elif os.path.exists(npy_path_test):
-            npy_path=npy_path_test
+        # elif os.path.exists(npy_path_test):
+        #     npy_path=npy_path_test
         else:
             print("object_info.npy file does not exist!!! scan_id:",scan_id)
             return None
@@ -1404,7 +1405,7 @@ def parse_args():
 
     parser.add_argument("--scannet_data_root", type=str, help="Path of folder that contains scannet scene folders such as 'scene0000_00'.")
     parser.add_argument("--script_root", type=str, help="Path of the Transcribe3D project folder.")
-    parser.add_argument("--mode", type=str, choices=["eval", "result","self_correct"], help="Mode of operation     (eval or result)")
+    parser.add_argument("--mode", type=str, choices=["eval", "result", "self_correct", "check_scanrefer"], help="Mode of operation     (eval or result)")
     parser.add_argument("--dataset", type=str, choices=["nr3d","sr3d","scanrefer"], help="Choose the refering dataset.")
     parser.add_argument("--conf_idx", type=int, help="Configuration index in file config.py.")
     parser.add_argument("--range", type=int, nargs='*', help="Range of line numbers of the refering dataset(will be fed to np.arange()). For nr3d and sr3d, the minimum is 2. For scanrefer, the minimum is 0.")
@@ -1482,6 +1483,10 @@ def main():
         print(formatted_time)
         for time in formatted_time:
             refer3d.self_correction_dataset(result_folder_path=args.script_root+eval_config['result_folder_name'], formatted_time=time, line_number_list=np.arange(0,400) if args.dataset=='scanrefer' else np.arange(2,400))
+
+    elif args.mode=="check_scanrefer":
+        """check the how many cases are provided with detected boxes that has 0.5(0.25) or higher iou with gt box"""
+        refer3d.check_scanrefer_answer_exist_percentage(0.5)
 
 
 

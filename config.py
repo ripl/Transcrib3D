@@ -255,4 +255,15 @@ confs_scanrefer={
         'use_code_interpreter':True,
         'tool':'gf'
     },
+    6:{
+        'dataset':'scanrefer',
+        'model':'gpt-4', # 4 with 3dvista
+        'result_folder_name':'eval_results_scanrefer_4_p_3dvista_valset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/scanrefer/ScanRefer_filtered_val_sampled1000.json",
+        'use_gt_box':False,
+        'use_priority':False,
+        'use_code_interpreter':True,
+        'tool':'3dvista_200c'
+    },
 }

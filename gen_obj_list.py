@@ -5,6 +5,7 @@ from plyfile import PlyData
 import pandas as pd
 import os
 from sklearn.cluster import DBSCAN
+from scipy import sparse
 from collections import Counter
 from scannet200_constants import VALID_CLASS_IDS_20,CLASS_LABELS_20,VALID_CLASS_IDS_200,CLASS_LABELS_200
 
@@ -596,6 +597,127 @@ def gen_obj_list_mask3d_align(scan_id,scannet_root,objects_info_folder_name,mask
 
     return objects_info
 
+def gen_obj_list_3dvista_align(scan_id,scannet_root,objects_info_folder_name,_3dvista_data_root=None,referit3d_data_root=None,conf_score_thr=0.5,save_per_instance_points=False,use_200_cats=True):
+    # 各个文件的路径
+    # aggregation_json_path = scannet_root+scan_id+"/"+scan_id+"_vh_clean.aggregation.json"
+    # segs_json_path = scannet_root+scan_id+"/"+scan_id+"_vh_clean_2.0.010000.segs.json"
+    ply_path = scannet_root+scan_id+"/"+scan_id+"_vh_clean_2.ply"
+    object_obb_data_path=referit3d_data_root+'object_oriented_bboxes_aligned_scans.json'
+    object_has_front_data_path=referit3d_data_root+'shapenet_has_front.csv'
+
+    # scan_info_txt_path=mask3d_root+scan_id+'.txt'
+
+    obj_mask_path = os.path.join(_3dvista_data_root, str(scan_id) + ".mask" + ".npz")
+    obj_label_path = os.path.join(_3dvista_data_root, str(scan_id) + ".label" + ".npy")
+    obj_score_path = os.path.join(_3dvista_data_root, str(scan_id) + ".score" + ".npy")
+    obj_masks = np.array(sparse.load_npz(obj_mask_path).todense())[:50, :]
+    obj_labels = np.load(obj_label_path)[:50]
+    obj_scores = np.load(obj_score_path)[:50]
+    # print(obj_scores)
+    
+    if not os.path.exists(scannet_root+objects_info_folder_name):
+        os.mkdir(scannet_root+objects_info_folder_name)
+
+    # # 打开txt
+    # with open(scan_info_txt_path)as f:
+    #     object_info_lines=f.readlines()
+
+
+    # 读入ply文件
+    print("loading .ply file...")
+    plydata=PlyData.read(ply_path)
+
+    header=plydata.header
+    print("header of .ply file:",header)
+
+    # 读入axis aline矩阵
+    filename = scannet_root+scan_id+'/'+scan_id+'.txt'  # 替换成实际的文件名
+    with open(filename, 'r') as file:
+        lines=file.readlines()
+        for line in lines:
+            if "axisAlignment" in line:
+                numbers = line.split('=')[1].strip().split()
+                break
+    axis_align_matrix = np.array(numbers, dtype=float).reshape(4, 4)
+
+    # 读入obb和has_front文件
+    obb_data=load_scan2cad_meta_data(object_obb_data_path)
+    has_front_data=load_has_front_meta_data(object_has_front_data_path)
+
+    # 定义最终返回的，记录所有object信息的dict
+    objects_info=[]
+
+    # 遍历 object masks
+    for i,mask in enumerate(obj_masks):
+        print("i:",i)
+        obj_label_idx=obj_labels[i]
+        obj_score=obj_scores[i]
+        # print("obj_score:",obj_score)
+
+        if use_200_cats:
+            obj_label=idx_2_label_200(obj_label_idx)
+        else:
+            obj_label=idx_2_label_20(obj_label_idx)
+
+        # 记录物体基本信息
+        info={"id":i,
+              "label":obj_label,
+              "score":obj_score
+              }
+        
+        # 在ply文件中找到物体对应的vertices
+        vertices_all=np.array(plydata.elements[0].data)
+        vertices=vertices_all[np.where(mask)]
+
+        vertices=np.array([list(vertex) for vertex in vertices]) #转换为2维numpy array
+        # print(vertices)
+        # print(vertices.shape)
+
+        # 转为axis aligned坐标
+        vertices_coord=vertices[:,0:3]
+        vertices_transpose=np.vstack([vertices_coord.T,np.ones([1,vertices_coord.shape[0]])])
+        vertices_aligned=np.dot(axis_align_matrix,vertices_transpose)[0:3,:]
+        vertices_aligned=vertices_aligned.T
+
+        # 处理点云
+        vertices_aligned=filter_pointcould(vertices_aligned)
+
+        # 保存该物体的点云
+        if save_per_instance_points:
+            # draw_points(vertices_aligned)
+            object_path=scannet_root+objects_info_folder_name+'/%s_%d_%s.npy'%(scan_id,i,obj_label)
+            np.save(object_path,vertices_aligned,allow_pickle=True)
+            print("object points saved to:",object_path)
+
+        # 计算相关参数并记录定量信息
+        # x_max,x_min,x_avg=np.max(vertices[:,0]),np.min(vertices[:,0]),np.average(vertices[:,0])
+        # y_max,y_min,y_avg=np.max(vertices[:,1]),np.min(vertices[:,1]),np.average(vertices[:,1])
+        # z_max,z_min,z_avg=np.max(vertices[:,2]),np.min(vertices[:,2]),np.average(vertices[:,2])
+        x_max,x_min,x_avg=np.max(vertices_aligned[:,0]),np.min(vertices_aligned[:,0]),np.average(vertices_aligned[:,0])
+        y_max,y_min,y_avg=np.max(vertices_aligned[:,1]),np.min(vertices_aligned[:,1]),np.average(vertices_aligned[:,1])
+        z_max,z_min,z_avg=np.max(vertices_aligned[:,2]),np.min(vertices_aligned[:,2]),np.average(vertices_aligned[:,2])
+
+        # info["quan_info"]=[x_avg,y_avg,z_avg,(x_max-x_min),(y_max-y_min),(z_max-z_min)]
+        info["centroid"]=[x_avg, y_avg, z_avg]
+        info["center_position"]=[(x_max+x_min)/2, (y_max+y_min)/2, (z_max+z_min)/2]
+        info["size"]=[(x_max-x_min),(y_max-y_min),(z_max-z_min)]
+        info["extension"]=[x_min,y_min,z_min,x_max,y_max,z_max]
+        info["median_rgba"]=[int(np.median(vertices[:,3])), int(np.median(vertices[:,4])), int(np.median(vertices[:,5])), int(np.median(vertices[:,6]))]
+
+        info['has_front']=False
+        info['front_point']=None
+        info['obb']=None
+        info['rot_angle']=None
+
+        objects_info.append(info)
+
+
+    save_path=scannet_root+"%s/%s_%s.npy"%(objects_info_folder_name,objects_info_folder_name,scan_id)
+    np.save(save_path,objects_info)
+    print("objects info save to:",save_path)
+
+    return objects_info
+
 
 
 def get_scan_id_list(data_root):
@@ -668,7 +790,7 @@ if __name__=='__main__':
 
 
     ## mask3d ##
-    use_200_cats=bool(0)
+    """use_200_cats=bool(1)
     if use_200_cats:
         mask3d_root="/share/data/ripl/vincenttann/Mask3D/eval_output/   instance_evaluation_mask3dTXS_export_scannet200_0/val/" # 200 cats
     else:
@@ -714,20 +836,50 @@ if __name__=='__main__':
                            save_per_instance_points=False,
                            use_200_cats=use_200_cats
                            )
-        # np.save(scannet_root+"objects_info_mask3d_90/objects_info_mask3d_90_"+scan_id+".npy", objects_info,allow_pickle=True)
+        # np.save(scannet_root+"objects_info_mask3d_90/objects_info_mask3d_90_"+scan_id+".npy", objects_info,allow_pickle=True)"""
 
-    # # mask3d处理test set 
-    # # scannet的test set没给axis align矩阵
-    # scannet_root="/share/data/ripl/scannet_raw/test/"
+
+    ## 3d-vista ##
+    use_200_cats=bool(1)
+    _3dvista_data_root="/share/data/ripl/vincenttann/save_mask/save_mask/"
+    referit3d_data_root="/share/data/ripl/vincenttann/sr3d/data/referit3d/"
+
+    # mask3d处理val set 
+    # scannet的test set没给axis align矩阵
+    scannet_root="/share/data/ripl/scannet_raw/train/"
     # scan_id_list_test=get_scan_id_list(scannet_root)
+    with open('data/scannetv2_val.txt') as f:
+        scan_id_list_val=f.readlines()
 
-    # for idx,scan_id in enumerate(scan_id_list_test):
-    #     # with open(record_file,'a') as f:
-    #     #     f.write("Processing test set: %s (%d/%d)...\n" % (scan_id,idx+1,len (scan_id_list_test)))
-    #     print("Processing test set: %s (%d/%d)..." % (scan_id,idx+1,len(scan_id_list_test)))
-    #     objects_info=gen_obj_list_mask3d(scan_id=scan_id, 
-    #                        scannet_root=scannet_root, 
-    #                        mask3d_root=mask3d_root,
-    #                        referit3d_data_root=referit3d_data_root
-    #                        )
-    #     np.save(scannet_root+"objects_info_mask3d/objects_info_mask3d_"+scan_id+".npy",   objects_info,allow_pickle=True)
+    for idx,line in enumerate(scan_id_list_val):
+        scan_id_list_val[idx]=line.strip()
+
+    i=0
+    start=50*i
+    end=50*(i+1)
+    max_idx=len(scan_id_list_val)-1
+    if end<max_idx:
+        scan_id_list_val_s=scan_id_list_val[start:end]
+    else:
+        scan_id_list_val_s=scan_id_list_val[start:]
+
+    # scan_id_list_val_s=['scene0568_00']
+
+    for idx,scan_id in enumerate(scan_id_list_val_s):
+        # with open(record_file,'a') as f:
+        #     f.write("Processing test set: %s (%d/%d)...\n" % (scan_id,idx+1,len   (scan_id_list_test)))
+        print("Processing val set: %s (%d/%d)..." % (scan_id,idx+1,len(scan_id_list_val_s)))
+
+        conf_score_thr=0.2
+        # objects_info_folder_name="objects_info_mask3d_"+str(int(conf_score_thr*100))
+        objects_info_folder_name="objects_info_3dvista_200c"
+        objects_info=gen_obj_list_3dvista_align(scan_id=scan_id, 
+                           scannet_root=scannet_root, 
+                           objects_info_folder_name=objects_info_folder_name,
+                           _3dvista_data_root=_3dvista_data_root,
+                           referit3d_data_root=referit3d_data_root,
+                           conf_score_thr=conf_score_thr,
+                           save_per_instance_points=False,
+                           use_200_cats=use_200_cats
+                           )
+        # np.save(scannet_root+"objects_info_mask3d_90/objects_info_mask3d_90_"+scan_id+".npy", objects_info,allow_pickle=True)
