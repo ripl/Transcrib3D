@@ -95,7 +95,7 @@ class ObjectFilter(Dialogue):
         response,token_usage=self.call_openai(prompt)
         response=response['content']
         # print("response:",response)
-        last_line=response.splitlines()[-1]
+        last_line = response.splitlines()[-1] if len(response) > 0 else ''
 
         # last_line_split=last_line.split('--')[-1]
 

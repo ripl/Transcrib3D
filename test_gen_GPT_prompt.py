@@ -255,7 +255,7 @@ def evaluate_on_GPT(sr3d_line_numbers):
 
         # 处理GPT的回复
         print("RESPOSE:\n",response)
-        last_line=response.splitlines()[-1]
+        last_line = response.splitlines()[-1] if len(response) > 0 else ''
         print(type(last_line))
         print("last_line:",last_line)
 

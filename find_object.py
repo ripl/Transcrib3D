@@ -135,7 +135,7 @@ def get_obj_id(metadata, obj_desc):
         # print("DIALOGUE:")
         # code_interpreter.print_pretext()
         # print("--------------------------------------------")
-        last_line=response.splitlines()[-1]
+        last_line = response.splitlines()[-1] if len(response) > 0 else ''
         # print(type(last_line))
         # print("last_line:",last_line)
 

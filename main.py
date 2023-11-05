@@ -756,7 +756,7 @@ class Refer3d:
                 print("DIALOGUE:")
                 code_interpreter.print_pretext()
                 print("--------------------------------------------")
-                last_line=response.splitlines()[-1]
+                last_line = response.splitlines()[-1] if len(response) > 0 else ''
                 print(type(last_line))
                 print("last_line:",last_line)
 
@@ -900,7 +900,7 @@ class Refer3d:
         print("--------------------------------------------")
 
         # 提取结果并检查是否为正确答案
-        last_line=response.splitlines()[-1]
+        last_line = response.splitlines()[-1] if len(response) > 0 else ''
         answer_id,_=self.extract_answer_id_from_last_line(last_line)
         if str(answer_id)==str(target_id):
             # correction后答案正确，删除correction prompt部分，只保留original prompt和推理过程
