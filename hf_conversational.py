@@ -70,8 +70,15 @@ if __name__=="__main__":
     model = HuggingfaceConversational(model_name)
     # print(model('What is the captial of France?'))
     # print(model('hi how are you?'))
-    conversation_1 = Conversation("Going to the movies tonight - any suggestions?")
+    # conversation_1 = Conversation("Going to the movies tonight - any suggestions?")
     # conversation_2 = Conversation("What's the last book you have read?")
-    answer = model(conversation_1)
+    # answer = model(conversation_1)
+    chat = [
+        {"role": "system", "content": "Hello, I'm a llama. I'm an AI assistant that can help you with your work."},
+        {"role": "user", "content": "Hello, how are you?"},
+        {"role": "assistant", "content": "I'm doing great. How can I help you today?"},
+        {"role": "user", "content": "I'd like to show off how chat templating works!"},
+    ]
+    answer = model(chat)
     print(answer.messages)
 
