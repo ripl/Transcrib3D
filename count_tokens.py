@@ -35,6 +35,6 @@ def count_token_in_folder(folder_path):
 
     return token_input_total,token_output_total,file_count
 
-folder_path="/share/data/ripl/vincenttann/sr3d/eval_results_sr3d_4_p_testset/2023-09-16-00-37-29/2023-09-16-00-37-29_dialogue_jsons"
+folder_path="/share/data/ripl/vincenttann/sr3d/eval_results_scanrefer_4_p_3dvista_valset/2023-11-07-00-31-39/2023-11-07-00-31-39_dialogue_jsons"
 token_input_total,token_output_total,file_count=count_token_in_folder(folder_path)
 print(token_input_total,token_output_total,file_count)

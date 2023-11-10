@@ -649,7 +649,7 @@ def gen_obj_list_3dvista_align(scan_id,scannet_root,objects_info_folder_name,_3d
 
     # 遍历 object masks
     for i,mask in enumerate(obj_masks):
-        print("i:",i)
+        # print("i:",i)
         obj_label_idx=obj_labels[i]
         obj_score=obj_scores[i]
         # print("obj_score:",obj_score)
@@ -680,7 +680,7 @@ def gen_obj_list_3dvista_align(scan_id,scannet_root,objects_info_folder_name,_3d
         vertices_aligned=vertices_aligned.T
 
         # 处理点云
-        vertices_aligned=filter_pointcould(vertices_aligned)
+        # vertices_aligned=filter_pointcould(vertices_aligned)
 
         # 保存该物体的点云
         if save_per_instance_points:
@@ -872,7 +872,7 @@ if __name__=='__main__':
 
         conf_score_thr=0.2
         # objects_info_folder_name="objects_info_mask3d_"+str(int(conf_score_thr*100))
-        objects_info_folder_name="objects_info_3dvista_200c"
+        objects_info_folder_name="objects_info_3dvista_200c_wof"
         objects_info=gen_obj_list_3dvista_align(scan_id=scan_id, 
                            scannet_root=scannet_root, 
                            objects_info_folder_name=objects_info_folder_name,
