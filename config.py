@@ -141,6 +141,26 @@ confs_nr3d={
     #     'use_priority':False,
     #     'use_code_interpreter':False
     # },
+    14:{
+        'dataset':'nr3d',
+        'model':'gpt-4',  # 4 with principle, no code interpreter
+        'result_folder_name':'eval_results_nr3d_4_p_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False
+    },
+    15:{
+        'dataset':'nr3d',
+        'model':'gpt-3.5-turbo',  # 3.5 with principle, no code interpreter
+        'result_folder_name':'eval_results_nr3d_35_p_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False
+    },
 }
 
 confs_sr3d={
