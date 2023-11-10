@@ -1,14 +1,15 @@
-import argparse
-parser = argparse.ArgumentParser(description="Description of your program")
+# Here's a simple Python code snippet that reads a JSON file.
+import json
 
-# 添加--mode参数
-parser.add_argument("--mode", type=str, choices=["eval", "result"], help="Mode of operation (eval or result)")
-parser.add_argument("--times", type=str, nargs='+', help="List of times in 'yy-mm-dd-HH-MM-SS' format")
-# 还可以添加其他参数
-# parser.add_argument("--another_option", type=str, help="Description of another option")
+# JSON file path
+json_file_path = 'object_filter_pretext.json'
 
-# 解析命令行参数
-args = parser.parse_args()
+# Read JSON file
+with open(json_file_path) as file:
+    data = json.load(file)
 
-print("mode:",args.mode)
-print("times:",args.times)
+# Output the data to check
+print(data)
+for d in data:
+    print(d['role'])
+    print(d['content'])

@@ -194,6 +194,34 @@ class Refer3d:
             data=json.loads(jf_data)
         return data
     
+    def rgb_to_hsv(self, rgb):
+        # Convert RGB to [0, 1] range
+        r_prime, g_prime, b_prime = rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0
+
+        # Calculate chroma
+        chroma = max(r_prime, g_prime, b_prime) - min(r_prime, g_prime, b_prime)
+
+        # Calculate hue
+        hue = 0
+        if chroma == 0:
+            hue = 0
+        elif max(r_prime, g_prime, b_prime) == r_prime:
+            hue = (g_prime - b_prime) / chroma % 6
+        elif max(r_prime, g_prime, b_prime) == g_prime:
+            hue = (b_prime - r_prime) / chroma + 2
+        elif max(r_prime, g_prime, b_prime) == b_prime:
+            hue = (r_prime - g_prime) / chroma + 4
+        hue *= 60  # Convert to degrees
+
+        # Calculate value
+        value = max(r_prime, g_prime, b_prime)
+
+        # Calculate saturation
+        saturation = 0 if value == 0 else chroma / value
+
+        return [hue, saturation * 100, value * 100]  # Return HSV as percentages
+
+
     @retry(wait=wait_exponential_jitter(initial=20, max=120, jitter=20), stop=stop_after_attempt(5), before_sleep=before_sleep_log(logger,logging.ERROR)) #20s,40s,80s,120s + random.uniform(0,20)
     def get_gpt_response(self,prompt:str,code_interpreter:CodeInterpreter):
         # get response from GPT(using code interpreter). using retry from tenacity.
@@ -538,8 +566,10 @@ class Refer3d:
 
             # nr3d和scanrefer，给出center、size、color
             else:
-                color=obj['median_rgba'][0:3] if (self.dataset=='scanrefer' and not self.use_gt_box) else obj['avg_rgba'][0:3]
-                line="%s,id=%s,ctr=%s,size=%s,RGB=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(color) ))
+                rgb=obj['median_rgba'][0:3] if (self.dataset=='scanrefer' and not self.use_gt_box) else obj['avg_rgba'][0:3]
+                hsv=self.round_list(self.rgb_to_hsv(rgb),2)
+                # line="%s,id=%s,ctr=%s,size=%s,RGB=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(rgb) ))
+                line="%s,id=%s,ctr=%s,size=%s,HSV=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsv) ))
                 
             prompt=prompt+line+direction_info
 
@@ -1464,7 +1494,9 @@ def main():
                     use_original_viewdep_judge=False,  
                     scanrefer_tool_name=tool,
                     use_priority=eval_config['use_priority'],
-                    use_code_interpreter=eval_config['use_code_interpreter']
+                    use_code_interpreter=eval_config['use_code_interpreter'],
+                    object_filter_result_check_folder_name="eval_results_scanrefer_4_p_3dvista_valset",
+                    object_filter_result_check_list=["2023-11-07-00-31-39","2023-11-07-02-44-23", "2023-11-07-03-20-04"]
                     )
 
     ###############################################################################
