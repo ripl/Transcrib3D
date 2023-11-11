@@ -221,6 +221,39 @@ class Refer3d:
 
         return [hue, saturation * 100, value * 100]  # Return HSV as percentages
 
+    def rgb_to_hsl(self,rgb):
+        # Normalize RGB values to the range [0, 1]
+        r, g, b = [x / 255.0 for x in rgb]
+
+        # Calculate min and max values of RGB to find chroma
+        c_max = max(r, g, b)
+        c_min = min(r, g, b)
+        chroma = c_max - c_min
+
+        # Calculate lightness
+        lightness = (c_max + c_min) / 2
+
+        # Calculate hue and saturation
+        hue = 0
+        saturation = 0
+
+        if chroma != 0:
+            if c_max == r:
+                hue = ((g - b) / chroma) % 6
+            elif c_max == g:
+                hue = ((b - r) / chroma) + 2
+            elif c_max == b:
+                hue = ((r - g) / chroma) + 4
+
+            hue *= 60
+
+            # Calculate saturation
+            if lightness <= 0.5:
+                saturation = chroma / (2 * lightness)
+            else:
+                saturation = chroma / (2 - 2 * lightness)
+
+        return [hue, saturation, lightness]
 
     @retry(wait=wait_exponential_jitter(initial=20, max=120, jitter=20), stop=stop_after_attempt(5), before_sleep=before_sleep_log(logger,logging.ERROR)) #20s,40s,80s,120s + random.uniform(0,20)
     def get_gpt_response(self,prompt:str,code_interpreter:CodeInterpreter):
@@ -567,9 +600,9 @@ class Refer3d:
             # nr3d和scanrefer，给出center、size、color
             else:
                 rgb=obj['median_rgba'][0:3] if (self.dataset=='scanrefer' and not self.use_gt_box) else obj['avg_rgba'][0:3]
-                hsv=self.round_list(self.rgb_to_hsv(rgb),2)
+                hsl=self.round_list(self.rgb_to_hsl(rgb),2)
                 # line="%s,id=%s,ctr=%s,size=%s,RGB=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(rgb) ))
-                line="%s,id=%s,ctr=%s,size=%s,HSV=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsv) ))
+                line="%s,id=%s,ctr=%s,size=%s,HSL=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsl) ))
                 
             prompt=prompt+line+direction_info
 
@@ -1473,7 +1506,8 @@ def main():
             'model': eval_config['model'],
             'temperature': 1e-7,
             'top_p': 1e-7,
-            'max_tokens': 4096,
+            # 'max_tokens': 4096,
+            'max_tokens':'inf',
             'system_message': system_message,
             # 'load_path': '',
             'save_path': 'chats',
