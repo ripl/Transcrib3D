@@ -18,8 +18,8 @@ def setup_pipeline(model_name, temperature=1e-7, top_p=1e-7, max_length=512):
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         device_map='auto',
-        load_in_4bit=True,
-        # load_in_8bit=True,
+        # load_in_4bit=True,
+        load_in_8bit=True,
         # torch_dtype=torch.bfloat16, 
         use_flash_attention_2=True,
         max_memory=max_memory
