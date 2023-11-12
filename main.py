@@ -30,7 +30,7 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 class Refer3d:
-    def __init__(self,scannet_data_root, script_root, dataset, refer_dataset_path, result_folder_name, gpt_config, scanrefer_iou_thr=0.5, use_gt_box=True, object_filter_result_check_folder_name=None, object_filter_result_check_list=None, use_principle=True,use_original_viewdep_judge=True,scanrefer_tool_name='mask3d',use_priority=False,use_code_interpreter=True) -> None:
+    def __init__(self,scannet_data_root, script_root, dataset, refer_dataset_path, result_folder_name, gpt_config, scanrefer_iou_thr=0.5, use_gt_box=True, object_filter_result_check_folder_name=None, object_filter_result_check_list=None, use_principle=True,use_original_viewdep_judge=True, use_object_filter=True, scanrefer_tool_name='mask3d',use_priority=False,use_code_interpreter=True) -> None:
         self.scannet_data_root=scannet_data_root
         self.script_root=script_root
         self.dataset=dataset
@@ -43,6 +43,7 @@ class Refer3d:
         self.object_filter_result_check_list=object_filter_result_check_list
         self.use_principle=use_principle
         self.use_original_viewdep_judge=use_original_viewdep_judge
+        self.use_object_filter = use_object_filter
         self.scanrefer_tool_name=scanrefer_tool_name
         self.use_priority=use_priority
         self.use_code_interpreter=use_code_interpreter
@@ -289,7 +290,7 @@ class Refer3d:
 
         return response
 
-    @retry(wait=wait_exponential_jitter(initial=20, max=120, jitter=20), stop=stop_after_attempt(5), before_sleep=before_sleep_log(logger,logging.ERROR)) #20s,40s,80s,120s + random.uniform(0,20)
+    @retry(wait=wait_exponential_jitter(initial=5, max=30, jitter=5), stop=stop_after_attempt(2), before_sleep=before_sleep_log(logger,logging.ERROR)) #20s,40s,80s,120s + random.uniform(0,20)
     def get_gpt_response_no_code_interpreter(self,prompt:str,gpt_dialogue:Dialogue):
         # get response from GPT(without code interpreter). using retry from tenacity.
         # count the token usage and time as well
@@ -400,7 +401,40 @@ class Refer3d:
         print("answer exist cases(multiple):")
         print("%.2f%% (%d/%d)"%(percentage,answer_exist_count_multiple,total_multiple))
 
-    def find_relevant_objects(self,data_index,scan_id,target_id,utterance,npy_path,use_npy_file=True,object_info_list=None):
+    def find_relevant_objects(self,data_index,scan_id,target_id,utterance,npy_path,use_npy_file=True,object_info_list=None, void=False):
+
+        if void: # not filter, return all objects
+            object_filter = ObjectFilter()
+            object_filter.load_path=None, 
+            object_filter.system_message=''
+
+            all_object_ids = []
+            if use_npy_file:
+                data=np.load(npy_path,allow_pickle=True)
+                for obj in data:
+                    if obj['label']=='object':
+                        continue
+                    # line="name=%s,id=%d; "%(obj['label'],obj['id'])
+                    # prompt=prompt+line
+                    all_object_ids.append(obj['id'])
+            else:
+                data=object_info_list
+                for obj in data:
+                    label=obj.get('cls')
+                    if label is None:
+                        label=obj.get('label')
+                    # if obj['cls']=='object':
+                    #     continue
+                    if label in ['object','otherfurniture','other','others']:
+                        continue
+                    # line="name=%s,id=%d; "%(label,obj['id'])
+                    # prompt=prompt+line
+                    all_object_ids.append(obj['id'])
+
+            target_dialogue_path = None
+
+            return all_object_ids, object_filter, target_dialogue_path
+
         # 新的两步法：先用object filter找到相关物体，在进行refer
         # 如果给出了object_filter_check_list，则在对应文件夹中检查，如果有则直接使用结果
         if self.object_filter_result_check_folder_name is not None:
@@ -537,7 +571,7 @@ class Refer3d:
                 
         else:
             # relevant_ids,object_filter,target_dialogue_path=self.find_relevant_objects(data_index,scan_id,target_id,utterance,npy_path)
-            relevant_ids,object_filter,target_dialogue_path=self.find_relevant_objects(data_index,scan_id,target_id,utterance,npy_path,use_npy_file=False,object_info_list=objects_info)
+            relevant_ids,object_filter,target_dialogue_path=self.find_relevant_objects(data_index,scan_id,target_id,utterance,npy_path,use_npy_file=False,object_info_list=objects_info, void=not self.use_object_filter)
 
             # objects_related = objects_info if (relevant_ids is None) else objects_info[relevant_ids]
             objects_related = objects_info if (relevant_ids is None) else [obj for obj in objects_info if obj['id'] in relevant_ids]
@@ -812,6 +846,7 @@ class Refer3d:
                 response="Fail to get response from GPT. RetryError in func get_gpt_response"
                 last_line="Nonesense"
                 get_gpt_response_success=False
+                code_interpreter = Dialogue(**self.gpt_config) # 这里必须给code_interpreter绑定一个值
 
             # 处理GPT的回复 （如果成功获取）
             if get_gpt_response_success:
@@ -1506,8 +1541,8 @@ def main():
             'model': eval_config['model'],
             'temperature': 1e-7,
             'top_p': 1e-7,
-            # 'max_tokens': 4096,
-            'max_tokens':'inf',
+            'max_tokens': 4096,
+            # 'max_tokens':'inf',
             'system_message': system_message,
             # 'load_path': '',
             'save_path': 'chats',
@@ -1517,6 +1552,10 @@ def main():
     tool=eval_config.get('tool') # scanrefer detection tool
     result_folder_name=eval_config['result_folder_name']
 
+    # set default value for use_object_filter to true in eval_config if not exist
+    if not 'use_object_filter' in eval_config:
+        eval_config['use_object_filter']=True
+
     refer3d=Refer3d(scannet_data_root=args.scannet_data_root, 
                     script_root=args.script_root,
                     dataset=eval_config['dataset'], 
@@ -1525,12 +1564,15 @@ def main():
                     gpt_config=openai_config,
                     use_gt_box=eval_config['use_gt_box'], 
                     use_principle=eval_config['use_principle'],
-                    use_original_viewdep_judge=False,  
+                    use_original_viewdep_judge=False,
+                    use_object_filter=eval_config['use_object_filter'],
                     scanrefer_tool_name=tool,
                     use_priority=eval_config['use_priority'],
                     use_code_interpreter=eval_config['use_code_interpreter'],
-                    object_filter_result_check_folder_name="eval_results_scanrefer_4_p_3dvista_valset",
-                    object_filter_result_check_list=["2023-11-07-00-31-39","2023-11-07-02-44-23", "2023-11-07-03-20-04"]
+                    # object_filter_result_check_folder_name="eval_results_scanrefer_4_p_3dvista_valset",
+                    # object_filter_result_check_list=["2023-11-07-00-31-39","2023-11-07-02-44-23", "2023-11-07-03-20-04"]
+                    object_filter_result_check_folder_name=None,
+                    object_filter_result_check_list=None,
                     )
 
     ###############################################################################
