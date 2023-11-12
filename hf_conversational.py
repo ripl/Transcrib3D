@@ -8,7 +8,9 @@ os.environ['TRANSFORMERS_CACHE'] = '/share/data/2pals/fjd/.cache/huggingface'
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, Conversation
 
-def setup_pipeline(model_name, temperature=1e-7, top_p=1e-7, max_length=512):
+from functools import reduce
+
+def setup_pipeline(model_name, temperature=1e-7, top_p=1e-7, max_length=4096):
     # set up resources
     # free_in_GB = int(torch.cuda.mem_get_info()[0]/1024**3)
     max_memory = f'{int(torch.cuda.mem_get_info()[0]/1024**3)-2}GB'
@@ -40,7 +42,7 @@ def setup_pipeline(model_name, temperature=1e-7, top_p=1e-7, max_length=512):
     return model, tokenizer, conversational_pipeline
 
 class HuggingfaceConversational:
-    def __init__(self, model_name, temperature=1e-7, top_p=1e-7, max_length=512):
+    def __init__(self, model_name, temperature=1e-7, top_p=1e-7, max_length=4096):
         self.model_name = model_name
         self.temperature = temperature
         self.top_p = top_p
@@ -48,7 +50,10 @@ class HuggingfaceConversational:
         self.model, self.tokenizer, self.conversational_pipeline = setup_pipeline(model_name, temperature, top_p, max_length)
 
     def __call__(self, conversation):
-        return self.conversational_pipeline(conversation)
+        chat_completion = self.conversational_pipeline(conversation)
+        token_length_list = [len(self.tokenizer(message['content'])['input_ids']) for message in chat_completion]
+        total_token_length = reduce(lambda x, y: x + y, token_length_list)
+        return chat_completion, total_token_length
         
 
 if __name__=="__main__":
@@ -79,6 +84,7 @@ if __name__=="__main__":
         {"role": "assistant", "content": "I'm doing great. How can I help you today?"},
         {"role": "user", "content": "I'd like to show off how chat templating works!"},
     ]
-    answer = model(chat)
+    answer, total_token_length = model(chat)
     print(answer.messages)
+    print('token length: ', total_token_length)
 

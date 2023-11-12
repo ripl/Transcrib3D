@@ -100,13 +100,11 @@ class Dialogue:
                 temperature=self.temperature,
                 top_p=self.top_p,
             )
-            # if self.debug:
-            #     print('completion: ', completion)
             assistant_response_message = completion.choices[0].message
             token_usage = completion.usage.total_tokens
         elif self.model in HUGGINGFACE_MODELS:
-            assistant_response_message = self.conversational(messages).messages[-1]
-            token_usage = 0
+            chat_completion_messages,token_usage = self.conversational(messages)
+            assistant_response_message = chat_completion_messages.messages[-1]
         else:
             raise Exception('model name {} not supported'.format(self.model))
         
