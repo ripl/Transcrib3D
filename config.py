@@ -161,6 +161,50 @@ confs_nr3d={
         'use_priority':False,
         'use_code_interpreter':False
     },
+    16:{
+        'dataset':'nr3d',
+        'model':'gpt-4',  # 4 with principle, no code interpreter, no object filter
+        'result_folder_name':'eval_results_nr3d_4_p_no_code_no_filter_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False,
+        'use_object_filter':False,
+    },
+    17:{
+        'dataset':'nr3d',
+        'model':'gpt-3.5-turbo',  # 3.5 with principle, no code interpreter, no object filter
+        'result_folder_name':'eval_results_nr3d_35_p_no_code_no_filter_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False,
+        'use_object_filter':False,
+    },
+    18:{
+        'dataset':'nr3d',
+        'model':'meta-llama/Llama-2-7b-chat-hf',
+        'result_folder_name':'eval_results_nr3d_llama2_7b_chat_p_no_filter_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False,
+        'use_object_filter':False,
+    },
+    19:{
+        'dataset':'nr3d',
+        'model':'codellama/CodeLlama-7b-Instruct-hf',
+        'result_folder_name':'eval_results_nr3d_codellama_7b_instruct_p_no_filter_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False,
+        'use_object_filter':False,
+    },
 }
 
 confs_sr3d={
@@ -265,6 +309,68 @@ confs_sr3d={
         'use_gt_box':True,
         'use_priority':False,
         'use_code_interpreter':True
+    },
+    10:{
+        'dataset':'sr3d',
+        'model':'meta-llama/Llama-2-7b-chat-hf', # llama2-7b-chat with principle
+        'result_folder_name':'eval_results_sr3d_llama2_7b_chat_p_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/sr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False
+    },
+    11:{
+        'dataset':'sr3d',
+        'model':'codellama/CodeLlama-7b-Instruct-hf', # llama2-7b-chat with principle
+        'result_folder_name':'eval_results_sr3d_codellama_7b_instruct_p_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/sr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False
+    },
+    12:{
+        'dataset':'sr3d',
+        'model':'meta-llama/Llama-2-7b-chat-hf', # llama2-7b-chat with principle
+        'result_folder_name':'eval_results_sr3d_llama2_7b_chat_p_no_filter_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/sr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False,
+        'use_object_filter':False,
+    },
+    13:{
+        'dataset':'sr3d',
+        'model':'codellama/CodeLlama-7b-Instruct-hf', # llama2-7b-chat with principle
+        'result_folder_name':'eval_results_sr3d_codellama_7b_instruct_p_no_filter_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/sr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False,
+        'use_object_filter':False,
+    },
+    14:{
+        'dataset':'sr3d',
+        'model':'gpt-3.5-turbo', # 3.5 zero shot principle
+        'result_folder_name':'eval_results_sr3d_35_p_no_code_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/sr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False
+    },
+    15:{
+        'dataset':'sr3d',
+        'model':'gpt-4',  # sr3d no code interpreter, with principle
+        'result_folder_name':'eval_results_sr3d_4_p_no_code_testset/',
+        'use_principle':True,
+        'refer_dataset_path':"./data/referit3d/sr3d_test_sampled1000.csv",
+        'use_gt_box':True,
+        'use_priority':False,
+        'use_code_interpreter':False
     },
 }
 
