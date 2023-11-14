@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 
 
 class Refer3d:
-    def __init__(self, scannet_data_root, script_root, dataset, refer_dataset_path, result_folder_name, gpt_config, scanrefer_iou_thr=0.5, use_gt_box=True, object_filter_result_check_folder_name=None, object_filter_result_check_list=None, use_principle=True, use_original_viewdep_judge=True, use_object_filter=True, scanrefer_tool_name='mask3d', use_priority=False, use_code_interpreter=True, obj_info_ablation_type=0) -> None:
+    def __init__(self, scannet_data_root, script_root, dataset, refer_dataset_path, result_folder_name, gpt_config, scanrefer_iou_thr=0.5, use_gt_box=True, object_filter_result_check_folder_name=None, object_filter_result_check_list=None, use_principle=True, use_original_viewdep_judge=True, use_object_filter=True, scanrefer_tool_name='mask3d', use_priority=False, use_code_interpreter=True, obj_info_ablation_type=0, use_camera_position=True, filter_behind_obj=True) -> None:
         self.scannet_data_root = scannet_data_root
         self.script_root = script_root
         self.dataset = dataset
@@ -48,6 +48,8 @@ class Refer3d:
         self.use_priority = use_priority
         self.use_code_interpreter = use_code_interpreter
         self.obj_info_ablation_type = obj_info_ablation_type
+        self.use_camera_position = use_camera_position
+        self.filter_behind_obj = filter_behind_obj
         self.token_usage_whole_run = 0
         self.token_usage_this_ques = 0
         self.time_consumed_whole_run = 0
@@ -148,12 +150,18 @@ class Refer3d:
         axis_align_matrix = np.array(numbers, dtype=float).reshape(4, 4)
         return axis_align_matrix
 
-    # def filter_out_obj_behind_camera(self, obj_list, camera_info):
-    #     camera_position=camera_info['position']
-    #     camera_lookat=camera_info['lookat']
-    #     obj_list_f=[]
-    #     for obj in obj_list:
-
+    def filter_out_obj_behind_camera(self, obj_list, camera_info):
+        camera_position=camera_info['position']
+        camera_lookat=camera_info['lookat']
+        lookat_vec=camera_lookat-camera_position
+        obj_list_f=[]
+        for obj in obj_list:
+            obj_vec=obj['center_position']-camera_position
+            if np.dot(lookat_vec,obj_vec)>=0:
+                obj_list_f.append(obj)
+        print("Before filter_out_obj_behind_camera: %d objects."%len(obj_list))
+        print("After filter_out_obj_behind_camera: %d objects."%len(obj_list_f))
+        return obj_list_f
 
     def center_size_to_extension(self, box_center_size):
         cx, cy, cz, sx, sy, sz = box_center_size
@@ -590,6 +598,10 @@ class Refer3d:
         npy_path = npy_path_train
         objects_info = np.load(npy_path, allow_pickle=True)  # objects_info是gt或3d segmentation得到的场景中所有物体的信息
 
+        # 如果是scanrefer且给了camera position和lookat，那么滤掉camera后面的物体
+        if self.dataset == 'scanrefer' and self.use_camera_position and self.filter_behind_obj:
+            objects_info = self.filter_out_obj_behind_camera(objects_info, camera_info_aligned)
+
         # 如果是scanrefer且不用gt box，要根据confidential score筛选一下
         if self.dataset == 'scanrefer' and not self.use_gt_box:
             objects_info_f = []
@@ -650,9 +662,11 @@ class Refer3d:
         if self.dataset == 'nr3d':
             prompt = prompt + "Scene center:%s. If no direction vector, observer at center for obj orientation.\n" % self.remove_spaces(str(scene_center))
         elif self.dataset == 'scanrefer':
-            # prompt = prompt + "Scene center:%s. If no direction vector, observer at center for obj orientation.\n" % self.remove_spaces(str(scene_center))
-            prompt = prompt + "Scene center:%s.\n" % self.remove_spaces(str(scene_center))
-            prompt = prompt + "Observer position:%s.\n" % self.remove_spaces(str(self.round_list(camera_info_aligned['position'])))
+            if self.use_camera_position:
+                prompt = prompt + "Scene center:%s. If no direction vector, observer at center for obj orientation.\n" % self.remove_spaces(str(scene_center))
+            else:
+                prompt = prompt + "Scene center:%s.\n" % self.remove_spaces(str(scene_center))
+                prompt = prompt + "Observer position:%s.\n" % self.remove_spaces(str(self.round_list(camera_info_aligned['position'], 2)))
 
         prompt = prompt + "objs list:\n"
         # 生成prompt中对物体的定量描述部分（遍历所有相关物体）
@@ -1586,6 +1600,8 @@ def parse_args():
     parser.add_argument("--line_numbers", type=int, nargs='*', help="When the 'range' parameter is not provided, you can specify non-contiguous line numbers here.")
     parser.add_argument("--ft", type=str, nargs='*', help="List of times in 'yy-mm-dd-HH-MM-SS' format. Requested for result mode.")
     parser.add_argument("--obj-info-ablation-type", type=int, default=0, help="Type of ablation for sr3d. 0: no ablation; 1: no size; 2: min+max; 3: reversed; 4: shuffled.")
+    parser.add_argument("--use_camera_position", type=bool, default=True)
+    parser.add_argument("--filter_behind_obj", type=bool, default=True)
 
     args = parser.parse_args()
 
@@ -1647,10 +1663,9 @@ def main():
                       scanrefer_tool_name=tool,
                       use_priority=eval_config['use_priority'],
                       use_code_interpreter=eval_config['use_code_interpreter'],
-                      # object_filter_result_check_folder_name="eval_results_scanrefer_4_p_3dvista_valset",
-                      # object_filter_result_check_list=["2023-11-07-00-31-39","2023-11-07-02-44-23", "2023-11-07-03-20-04"]
-                      object_filter_result_check_folder_name=None,
-                      object_filter_result_check_list=None,
+
+                      object_filter_result_check_folder_name="eval_results_scanrefer_4_p_gtbox_valset",
+                      object_filter_result_check_list=['2023-11-14-08-00-13'],
                       obj_info_ablation_type=args.obj_info_ablation_type
                       )
 
