@@ -30,7 +30,7 @@ logger.addHandler(console_handler)
 
 
 class Refer3d:
-    def __init__(self, scannet_data_root, script_root, dataset, refer_dataset_path, result_folder_name, gpt_config, scanrefer_iou_thr=0.5, use_gt_box=True, object_filter_result_check_folder_name=None, object_filter_result_check_list=None, use_principle=True, use_original_viewdep_judge=True, use_object_filter=True, scanrefer_tool_name='mask3d', use_priority=False, use_code_interpreter=True) -> None:
+    def __init__(self, scannet_data_root, script_root, dataset, refer_dataset_path, result_folder_name, gpt_config, scanrefer_iou_thr=0.5, use_gt_box=True, object_filter_result_check_folder_name=None, object_filter_result_check_list=None, use_principle=True, use_original_viewdep_judge=True, use_object_filter=True, scanrefer_tool_name='mask3d', use_priority=False, use_code_interpreter=True, obj_info_ablation_type=0) -> None:
         self.scannet_data_root = scannet_data_root
         self.script_root = script_root
         self.dataset = dataset
@@ -47,6 +47,7 @@ class Refer3d:
         self.scanrefer_tool_name = scanrefer_tool_name
         self.use_priority = use_priority
         self.use_code_interpreter = use_code_interpreter
+        self.obj_info_ablation_type = obj_info_ablation_type
         self.token_usage_whole_run = 0
         self.token_usage_this_ques = 0
         self.time_consumed_whole_run = 0
@@ -591,7 +592,7 @@ class Refer3d:
             prompt = prompt + "Scene center:%s. If no direction vector, observer at center for obj orientation.\n" % self.remove_spaces(str(scene_center))
 
         prompt = prompt + "objs list:\n"
-
+        lines = []
         # 生成prompt中对物体的定量描述部分（遍历所有相关物体）
         for obj in objects_related:
             # 位置信息，保留2位小数
@@ -627,10 +628,18 @@ class Refer3d:
 
             # sr3d，给出center、size
             if self.dataset == 'sr3d':
-                # line="%s,id=%s,ctr=%s,size=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)) )
-                line = f'{obj["label"]},id={obj["id"]},ctr={self.remove_spaces(str(center_position))},size={self.remove_spaces(str(size))}'
-                # line = f'{obj["label"]},id={obj["id"]},ctr={self.remove_spaces(str(center_position))}'  # remove size
-                # line = f'{obj["label"]},id={obj["id"]},xmin={np.round(center_position[0]-size[0]/2, 2)},xmax={np.round(center_position[0]+size[0]/2, 2)},ymin={np.round(center_position[1]-size[1]/2, 2)},ymax={np.round(center_position[1]+size[1]/2, 2)},zmin={np.round(center_position[2]-size[2]/2, 2)},zmax={np.round(center_position[2]+size[2]/2, 2)}'  # use min and max vals of x,y,z instead of center and size
+                if self.obj_info_ablation_type == 1:
+                    # no size
+                    line = f'{obj["label"]},id={obj["id"]},ctr={self.remove_spaces(str(center_position))}'
+                elif self.obj_info_ablation_type == 2:
+                    # min+max
+                    line = f'{obj["label"]},id={obj["id"]},xmin={np.round(center_position[0]-size[0]/2, 2)},xmax={np.round(center_position[0]+size[0]/2, 2)},ymin={np.round(center_position[1]-size[1]/2, 2)},ymax={np.round(center_position[1]+size[1]/2, 2)},zmin={np.round(center_position[2]-size[2]/2, 2)},zmax={np.round(center_position[2]+size[2]/2, 2)}'
+                elif self.obj_info_ablation_type == 3:
+                    # reversed
+                    line = f'size={self.remove_spaces(str(size))},ctr={self.remove_spaces(str(center_position))},id={obj["id"]},{obj["label"]}'
+                else:
+                    # vanilla
+                    line = f'{obj["label"]},id={obj["id"]},ctr={self.remove_spaces(str(center_position))},size={self.remove_spaces(str(size))}'
 
             # nr3d和scanrefer，给出center、size、color
             else:
@@ -639,7 +648,11 @@ class Refer3d:
                 # line="%s,id=%s,ctr=%s,size=%s,RGB=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(rgb) ))
                 line = "%s,id=%s,ctr=%s,size=%s,HSL=%s" % (obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsl)))
 
-            prompt = prompt + line + direction_info
+            lines.append(line + direction_info)
+        if self.obj_info_ablation_type == 4:
+            # shuffle order
+            random.shuffle(lines)
+        prompt = prompt + ''.join(lines)
 
         # prompt中的要求
         line = "Instruction:find the one described object in description: \n\"%s\"\n" % utterance
@@ -1511,6 +1524,7 @@ def parse_args():
     parser.add_argument("--range", type=int, nargs='*', help="Range of line numbers of the refering dataset(will be fed to np.arange()). For nr3d and sr3d, the minimum is 2. For scanrefer, the minimum is 0.")
     parser.add_argument("--line_numbers", type=int, nargs='*', help="When the 'range' parameter is not provided, you can specify non-contiguous line numbers here.")
     parser.add_argument("--ft", type=str, nargs='*', help="List of times in 'yy-mm-dd-HH-MM-SS' format. Requested for result mode.")
+    parser.add_argument("--obj-info-ablation-type", type=int, default=0, help="Type of ablation for sr3d. 0: no ablation; 1: no size; 2: min+max; 3: reversed; 4: shuffled.")
 
     args = parser.parse_args()
 
@@ -1576,6 +1590,7 @@ def main():
                       # object_filter_result_check_list=["2023-11-07-00-31-39","2023-11-07-02-44-23", "2023-11-07-03-20-04"]
                       object_filter_result_check_folder_name=None,
                       object_filter_result_check_list=None,
+                      obj_info_ablation_type=args.obj_info_ablation_type
                       )
 
     ###############################################################################

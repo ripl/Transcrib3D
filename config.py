@@ -382,6 +382,26 @@ confs_sr3d = {
         'use_priority': False,
         'use_code_interpreter': False
     },
+    17: {
+        'dataset': 'sr3d',
+        'model': 'gpt-3.5-turbo',
+        'result_folder_name': 'eval_results_sr3d_35_p_test_assembled/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/sr3d_test_assembled100x5.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    18: {
+        'dataset': 'sr3d',
+        'model': 'gpt-3.5-turbo',
+        'result_folder_name': 'eval_results_sr3d_35_p_test_assembled/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/sr3d_test_assembled100x5.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
 }
 
 confs_scanrefer = {
