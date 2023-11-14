@@ -26,10 +26,11 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 class ObjectFilter(Dialogue):
-    def __init__(self):
+    def __init__(self, model='gpt-4'):
         config = {
-        'model': 'gpt-4',
+        # 'model': 'gpt-4',
         # 'model': 'gpt-4-1106-preview',
+        'model': model,
         'temperature': 0,
         'top_p': 0.0,
         'max_tokens': 'inf',
@@ -83,7 +84,7 @@ class ObjectFilter(Dialogue):
     @retry(wait=wait_exponential_jitter(initial=20, max=120, jitter=20), stop=stop_after_attempt(5), before_sleep=before_sleep_log(logger,logging.ERROR)) #20s,40s,80s,120s + random.uniform(0,20)
     def filter_objects_by_description(self,description,use_npy_file,objects_info_path=None,object_info_list=None,to_print=True):
         # first, create the prompt
-        print("looking for relevant objects based on description:\n%s"%description)
+        print("looking for relevant objects based on description:\n'%s'"%description)
         prompt=""
         prompt=prompt+"description:\n'%s'\nobject list:\n"%description
         # load object info data and add to prompt

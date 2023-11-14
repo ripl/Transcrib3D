@@ -97,19 +97,28 @@ class Refer3d:
                 zmax = z
         return self.round_list([(xmin + xmax) / 2, (ymin + ymax) / 2, (zmin + zmax) / 2], 2)
 
-    def get_scanrefer_camera_info(self,scan_id,object_id,annotation_id):
-        json_path=os.path.join(self.script_root,'data/scanrefer_camera','%s.anns.json'%scan_id)
+    def get_scanrefer_camera_info_aligned(self,scan_id,object_id,annotation_id):
+        """Return camera info which is axis aligned"""
+        json_path=os.path.join(self.script_root,'data/scanrefer_camera_info','%s.anns.json'%scan_id)
         with open(json_path) as f:
             data=json.load(f)
         target_annotation = [d for d in data if d['object_id'] == object_id and d['ann_id'] == annotation_id]
         if target_annotation:
             if len(target_annotation)>1:
                 print("%d camera info found! Returning the first one. scan_id=%s, object_id=%s, annotation_id=%s."%(len(target_annotation),scan_id,object_id,annotation_id))
-            return target_annotation[0]['camera']
+            camera_info = target_annotation[0]['camera']
+            position = camera_info['position']
+            lookat = camera_info['lookat']
+            # align the vectors(coordinates)
+            axis_align_matrix = self.get_axis_align_matrix(os.path.join(self.script_root, "data/scannet_scene_info", scan_id+".txt"))
+            position_aligned = np.dot(axis_align_matrix, np.append(position,1).reshape(4,1))[0:3].reshape(-1)
+            lookat_aligned = np.dot(axis_align_matrix, np.append(lookat,1).reshape(4,1))[0:3].reshape(-1)
+            camera_info_aligned={'position':position_aligned, 'lookat':lookat_aligned}
+            return camera_info_aligned
+        
         else:
             print("No camera info found! scan_id=%s, object_id=%s, annotation_id=%s."%(scan_id,object_id,annotation_id))
             return None
-
 
     def round_list(self, lst, length):
         # round every element in lst
@@ -128,6 +137,23 @@ class Refer3d:
         assert len(gt_box) == 1, "Multiple gt box found!!! scan_id=%d, object_id=%d, gt_box found:%s" % (scan_id, object_id, str(gt_box))
 
         return self.center_size_to_extension(gt_box.reshape(-1)[0:6])
+
+    def get_axis_align_matrix(self, txt_path):
+        with open(txt_path, 'r') as file:
+            lines=file.readlines()
+            for line in lines:
+                if "axisAlignment" in line:
+                    numbers = line.split('=')[1].strip().split()
+                    break
+        axis_align_matrix = np.array(numbers, dtype=float).reshape(4, 4)
+        return axis_align_matrix
+
+    # def filter_out_obj_behind_camera(self, obj_list, camera_info):
+    #     camera_position=camera_info['position']
+    #     camera_lookat=camera_info['lookat']
+    #     obj_list_f=[]
+    #     for obj in obj_list:
+
 
     def center_size_to_extension(self, box_center_size):
         cx, cy, cz, sx, sy, sz = box_center_size
@@ -446,7 +472,6 @@ class Refer3d:
                     all_object_ids.append(obj['id'])
 
             target_dialogue_path = None
-
             return all_object_ids, object_filter, target_dialogue_path
 
         # 新的两步法：先用object filter找到相关物体，在进行refer
@@ -479,7 +504,12 @@ class Refer3d:
             
         else:
             target_dialogue_path = None
-            object_filter = ObjectFilter()
+            if  self.gpt_config['model'] == 'gpt-4-1106-preview': # 如果refer model用4 turbo，那OF也用
+                model = 'gpt-4-1106-preview'
+            else:
+                model = 'gpt-4'
+            print("model used in object filter:",model)
+            object_filter = ObjectFilter(model)
             of_start_time = time.time()
             # relevant_ids, token_usage_of = object_filter.filter_objects_by_description(description=utterance, use_npy_file=use_npy_file, objects_info_path=npy_path,object_info_list=object_info_list, to_print=True)
             relevant_dict,token_usage_of=object_filter.filter_objects_by_description(description=utterance,use_npy_file=use_npy_file, objects_info_path=npy_path,object_info_list=object_info_list, to_print=True)
@@ -496,7 +526,7 @@ class Refer3d:
             self.time_consumed_whole_run += time_consumed
             print("\n*** Object filter: token usage=%d, time consumed=%ds, TPM=%.2f ***\n" % (token_usage_of, time_consumed, token_usage_of / time_consumed * 60))
 
-        return relevant_ids, object_filter, target_dialogue_path
+        return relevant_ids, relevant_dict, object_filter, target_dialogue_path
 
     def remove_spaces(self, s: str):
         return s.replace(' ', '')
@@ -545,6 +575,7 @@ class Refer3d:
         # 读入scanrefer的一些信息
         else:
             annotation_id = data['ann_id']
+            camera_info_aligned=self.get_scanrefer_camera_info_aligned(scan_id,target_id,annotation_id)
 
         # 读入事先准备好的物体信息，即npy文件
         npy_path_train = os.path.join(self.scannet_data_root, "objects_info_%s" % self.scanrefer_tool_name, "objects_info_%s_%s.npy" % (self.scanrefer_tool_name, scan_id)) if (self.dataset == 'scanrefer' and not self.use_gt_box) else os.path.join(self.scannet_data_root, "objects_info", "objects_info_%s.npy" % scan_id)
@@ -559,13 +590,15 @@ class Refer3d:
         npy_path = npy_path_train
         objects_info = np.load(npy_path, allow_pickle=True)  # objects_info是gt或3d segmentation得到的场景中所有物体的信息
 
-        # 如果是scanrefer，要根据confidential score筛选一下
-        if self.dataset == 'scanrefer':
+        # 如果是scanrefer且不用gt box，要根据confidential score筛选一下
+        if self.dataset == 'scanrefer' and not self.use_gt_box:
             objects_info_f = []
             for obj in objects_info:
                 score = obj.get('score')
                 if score is None or score > 0.4:
                     objects_info_f.append(obj)
+                    if score is None:
+                        print("get confidential score failed!!")
             if score is not None:
                 objects_info = self.non_max_suppression(objects_info_f)
 
@@ -613,12 +646,15 @@ class Refer3d:
         scene_center = self.get_scene_center(objects_info)  # 注意这里应该用所有物体的信息，而不只是relevant
 
         # 生成prompt中的背景信息部分
-        prompt = scan_id + ":objs with quant description based on r-h Cartesian coord sys with x-y-z axes,  x-y plane=ground, z-axis=up/down. coords format [x, y, z].\n"
-        if not self.dataset == 'sr3d':
+        prompt = scan_id + ":objs with quant description based on r-h Cartesian coord sys with x-y-z axes, x-y plane=ground, z-axis=up/down. coords format [x, y, z].\n"
+        if self.dataset == 'nr3d':
             prompt = prompt + "Scene center:%s. If no direction vector, observer at center for obj orientation.\n" % self.remove_spaces(str(scene_center))
+        elif self.dataset == 'scanrefer':
+            # prompt = prompt + "Scene center:%s. If no direction vector, observer at center for obj orientation.\n" % self.remove_spaces(str(scene_center))
+            prompt = prompt + "Scene center:%s.\n" % self.remove_spaces(str(scene_center))
+            prompt = prompt + "Observer position:%s.\n" % self.remove_spaces(str(self.round_list(camera_info_aligned['position'])))
 
         prompt = prompt + "objs list:\n"
-        lines = []
         # 生成prompt中对物体的定量描述部分（遍历所有相关物体）
         for obj in objects_related:
             # 位置信息，保留2位小数
@@ -630,8 +666,8 @@ class Refer3d:
             # extension信息，保留2位小数
             extension = obj['extension']
             extension = self.round_list(extension, 2)
-            # 方向信息，用方向向量表示
-            if obj['has_front']:
+            # 方向信息，用方向向量表示. 注意，scanrefer由于用的不是scannet原始obj id，所以不能用方向信息
+            if obj['has_front'] and self.dataset!='scanrefer': 
                 front_point = np.array(obj['front_point'])
                 center = np.array(obj['obb'][0:3])
                 direction_vector = front_point - center
@@ -643,13 +679,9 @@ class Refer3d:
                 right_vector = self.round_list(np.cross(up_vector, direction_vector_normalized), 2)
                 behind_vector = self.round_list(-np.array(front_vector), 2)
                 # 生成方向信息
-                # direction_info="The direction that this %s is facing can be represented by a normalized direction vector %s\n"%(obj['label'], direction_vector_normalized)
                 direction_info = ";direction vectors:front=%s,left=%s,right=%s,behind=%s\n" % (front_vector, left_vector, right_vector, behind_vector)
                 #
             else:
-                # direction_vector=None
-                # direction_vector_normalized=None
-                # direction_info="The direction that this %s is facing is unknown.\n"%obj['label']
                 direction_info = "\n"  # 未知方向向量就啥都不写
 
             # sr3d，给出center、size
@@ -672,9 +704,9 @@ class Refer3d:
                 rgb=obj['median_rgba'][0:3] if (self.dataset=='scanrefer' and not self.use_gt_box) else obj['avg_rgba'][0:3]
                 hsl=self.round_list(self.rgb_to_hsl(rgb),2)
 
-                line="%s,id=%s,ctr=%s,size=%s,RGB=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(rgb) )) #原版rgb
+                # line="%s,id=%s,ctr=%s,size=%s,RGB=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(rgb) )) #原版rgb
                 # line="%s,id=%s,ctr=%s,size=%s,HSL=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsl))) #rgb换成hsl
-                # line="%s(relevant to %s),id=%s,ctr=%s,size=%s,HSL=%s" %(obj['label'], id_to_name_in_description[obj['id']], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsl) )) # 格式：name=原名称(description里的名称)
+                line="%s(relevant to %s),id=%s,ctr=%s,size=%s,HSL=%s" %(obj['label'], id_to_name_in_description[obj['id']], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsl) )) # 格式：name=原名称(description里的名称)
                 # if id_to_name_in_description[obj['id']]=='room':
                 #     name=obj['label']
                 # else:
@@ -1508,7 +1540,6 @@ def find_number_list_in_log(log_file):
     print(numbers_a)
     return numbers_a
 
-
 def find_number_list_in_failure_log(log_file):
     line_numbers = []
 
@@ -1525,7 +1556,6 @@ def find_number_list_in_failure_log(log_file):
             else:
                 i += 1
     return line_numbers
-
 
 def random_sampling(lower, upper, mode, para):
     if mode == 'rate':
@@ -1589,8 +1619,8 @@ def main():
         'model': eval_config['model'],
         'temperature': 1e-7,
         'top_p': 1e-7,
-        'max_tokens': 4096,
-        # 'max_tokens':'inf',
+        # 'max_tokens': 4096,
+        'max_tokens': 8192,
         'system_message': system_message,
         # 'load_path': '',
         'save_path': 'chats',

@@ -416,6 +416,16 @@ confs_scanrefer = {
         'use_priority': False,
         'use_code_interpreter': True
     },
+    100: {
+        'dataset': 'scanrefer',
+        'model': 'gpt-4-1106-preview',  # 4 with gt box on val set
+        'result_folder_name': 'eval_results_scanrefer_4_p_gtbox_valset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/scanrefer/ScanRefer_filtered_val_sampled1000.json",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
     1: {
         'dataset': 'scanrefer',
         'model': 'gpt-4',  # 4 with gt box on train set
@@ -504,7 +514,7 @@ confs_scanrefer = {
         'use_code_interpreter': True,
         'tool': '3dvista_200c_wof'
     },
-    8: {
+    107: {
         'dataset': 'scanrefer',
         # 'model':'gpt-4', # 4 with 3dvista without filtering pc
         'model': 'gpt-4-1106-preview',  # 4-turbo with 3dvista without filtering pc

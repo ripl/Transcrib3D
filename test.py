@@ -1,28 +1,39 @@
-import re
+import os
+import shutil
 
-def exact_dict_from_text(text):
-    # 使用正则表达式匹配文字中的字典
-    match = re.search(r'{\s*(.*?)\s*}', text)
-    
-    if match:
-        # 获取匹配到的字典内容
-        dict_str = match.group(1)
-        
-        # 将字典字符串转换为实际的字典对象
-        try:
-            result_dict = eval('{' + dict_str + '}')
-            return result_dict
-        except Exception as e:
-            print(f"Error converting string to dictionary: {e}")
-            return None
-    else:
-        print("No dictionary found in the given text.")
-        return None
+def copy_specific_files(src_directory):
+    """
+    Copies files that match the specific format (subfolder name equals file name with .txt extension)
+    from subfolders of the given source directory to a target directory named 'scannet_scene_info'
+    located in the parent directory of the source directory.
 
-# 示例用法
-text = "This is some text with a dictionary: {'table':[9,13,20],'kitchen cabinet':[6], 'trash can':[1], 'instrument case':[6], 'tv':[7], 'refrigerator':[21], 'room':[15,22,23], 'chair':[0]}"
-result = exact_dict_from_text(text)
+    :param src_directory: Path to the source directory (Folder A).
+    """
+    # Define the target directory
+    parent_directory = os.path.dirname(src_directory)
+    target_directory = os.path.join(parent_directory, 'scannet_scene_info')
 
-if result:
-    print("Extracted dictionary:")
-    print(result)
+    # Create the target directory if it does not exist
+    if not os.path.exists(target_directory):
+        os.makedirs(target_directory)
+
+    # Walk through the subdirectories of the source directory
+    for subdir, _, files in os.walk(src_directory):
+        subdir_name = os.path.basename(subdir)
+        for file in files:
+            # Check if the file name matches the format (subfolder_name.txt)
+            if file == f'{subdir_name}.txt':
+                src_file_path = os.path.join(subdir, file)
+                target_file_path = os.path.join(target_directory, file)
+
+                # Copy the file to the target directory
+                shutil.copy(src_file_path, target_file_path)
+
+# Usage example:
+# Assuming your current working directory is the Folder A
+# current_directory = os.getcwd()
+current_directory = "H:\ScanNet_Data\data\scannet\scans"
+copy_specific_files(current_directory)
+
+# You need to replace 'current_directory' with the actual path of Folder A when you run the script.
+
