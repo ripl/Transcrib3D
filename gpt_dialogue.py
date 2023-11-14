@@ -3,6 +3,8 @@ import json
 import datetime
 import openai
 openai.api_key = os.getenv("OPENAI_API_KEY")
+from openai import OpenAI
+client = OpenAI()
 # openai.api_key = "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"
 
 HUGGINGFACE_MODELS = {
@@ -93,14 +95,25 @@ class Dialogue:
     def call_openai(self, user_prompt):
         user_message = [{"role": "user", "content": user_prompt}]
         messages = self.pretext + user_message
-        if self.model in ['gpt-4', 'gpt-3.5-turbo']:
-            completion = openai.ChatCompletion.create(
+        # print('messages: ', messages)
+        if 'gpt' in self.model:
+            completion = client.chat.completions.create(
                 model=self.model,
                 messages=self.pretext + user_message,
                 temperature=self.temperature,
                 top_p=self.top_p,
+                seed=42,
             )
-            assistant_response_message = completion.choices[0].message
+            # completion = openai.ChatCompletion.create(
+            #     model=self.model,
+            #     messages=self.pretext + user_message,
+            #     temperature=self.temperature,
+            #     top_p=self.top_p,
+            # )
+            # print('completion: ', completion)
+            raw_response_message = completion.choices[0].message
+            assistant_response_message = {'role': raw_response_message.role, 'content': raw_response_message.content}
+            # print('assistant_response_message: ', assistant_response_message)
             token_usage = completion.usage.total_tokens
         elif self.model in HUGGINGFACE_MODELS:
             chat_completion_messages,token_usage = self.conversational(messages)
@@ -116,11 +129,13 @@ class Dialogue:
 if __name__ == '__main__':
 
     config = {
-        'model': 'gpt-4',
+        # 'model': 'gpt-4-1106-preview',
+        # 'model': 'gpt-4',
         # 'model': 'gpt-3.5-turbo',
+        'model': 'meta-llama/Llama-2-7b-chat-hf',
         'temperature': 0,
-        'top_p': 0.1,
-        'max_tokens': 'inf',
+        'top_p': 0.0,
+        'max_tokens': 8192,
         'system_message': '',
         # 'load_path': 'chats/dialogue_an apple.json',
         'save_path': 'chats',
@@ -163,5 +178,6 @@ if __name__ == '__main__':
                 config['save_path'], 'dialogue_' + timestamp + '.json'))
             continue
         else:
-            response = dialogue.call_openai(user_prompt)['content']
+            assistant_response_message, token_usage = dialogue.call_openai(user_prompt)
+            response = assistant_response_message['content']
             print('Bot:', response)
