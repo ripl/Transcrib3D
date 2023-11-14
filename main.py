@@ -95,6 +95,20 @@ class Refer3d:
                 zmax=z
         return self.round_list([(xmin+xmax)/2,(ymin+ymax)/2,(zmin+zmax)/2],2)        
 
+    def get_scanrefer_camera_info(self,scan_id,object_id,annotation_id):
+        json_path=os.path.join(self.script_root,'data/scanrefer_camera','%s.anns.json'%scan_id)
+        with open(json_path) as f:
+            data=json.load(f)
+        target_annotation = [d for d in data if d['object_id'] == object_id and d['ann_id'] == annotation_id]
+        if target_annotation:
+            if len(target_annotation)>1:
+                print("%d camera info found! Returning the first one. scan_id=%s, object_id=%s, annotation_id=%s."%(len(target_annotation),scan_id,object_id,annotation_id))
+            return target_annotation[0]['camera']
+        else:
+            print("No camera info found! scan_id=%s, object_id=%s, annotation_id=%s."%(scan_id,object_id,annotation_id))
+            return None
+
+
     def round_list(self,lst,length):
         # round every element in lst
         for idx,num in enumerate(lst):
@@ -427,12 +441,17 @@ class Refer3d:
                 last_line=of_response.splitlines()[-1]
             object_filter=ObjectFilter()
             relevant_ids=object_filter.extract_all_int_lists_from_text(last_line)
+            relevant_dict=object_filter.extract_dict_from_text(last_line)
             
         else:
             target_dialogue_path=None
             object_filter=ObjectFilter()
             of_start_time=time.time()
-            relevant_ids,token_usage_of=object_filter.filter_objects_by_description(description=utterance,use_npy_file=use_npy_file, objects_info_path=npy_path, object_info_list=object_info_list, to_print=True)
+            # relevant_ids,token_usage_of=object_filter.filter_objects_by_description(description=utterance,use_npy_file=use_npy_file, objects_info_path=npy_path,object_info_list=object_info_list, to_print=True)
+            relevant_dict,token_usage_of=object_filter.filter_objects_by_description(description=utterance,use_npy_file=use_npy_file, objects_info_path=npy_path,object_info_list=object_info_list, to_print=True)
+            relevant_ids=[]
+            for lst in relevant_dict.values():
+                relevant_ids+=lst
 
             # 统计时间和token
             of_end_time=time.time()
@@ -443,7 +462,7 @@ class Refer3d:
             self.time_consumed_whole_run+=time_consumed
             print("\n*** Object filter: token usage=%d, time consumed=%ds, TPM=%.2f ***\n"%(token_usage_of,time_consumed,token_usage_of/time_consumed*60))
 
-        return relevant_ids,object_filter,target_dialogue_path
+        return relevant_ids,relevant_dict,object_filter,target_dialogue_path
 
     def remove_spaces(self,s:str):
         return s.replace(' ','')
@@ -537,7 +556,14 @@ class Refer3d:
                 
         else:
             # relevant_ids,object_filter,target_dialogue_path=self.find_relevant_objects(data_index,scan_id,target_id,utterance,npy_path)
-            relevant_ids,object_filter,target_dialogue_path=self.find_relevant_objects(data_index,scan_id,target_id,utterance,npy_path,use_npy_file=False,object_info_list=objects_info)
+            relevant_ids,relevant_dict,object_filter,target_dialogue_path=self.find_relevant_objects(data_index,scan_id,target_id,utterance,npy_path,use_npy_file=False,object_info_list=objects_info)
+            # create a mapping from id to the relevant obj name in description
+            id_to_name_in_description={}
+            for name,ids in relevant_dict.items():
+                for id in ids:
+                    id_to_name_in_description[id]=name
+
+
 
             # objects_related = objects_info if (relevant_ids is None) else objects_info[relevant_ids]
             objects_related = objects_info if (relevant_ids is None) else [obj for obj in objects_info if obj['id'] in relevant_ids]
@@ -601,8 +627,16 @@ class Refer3d:
             else:
                 rgb=obj['median_rgba'][0:3] if (self.dataset=='scanrefer' and not self.use_gt_box) else obj['avg_rgba'][0:3]
                 hsl=self.round_list(self.rgb_to_hsl(rgb),2)
-                # line="%s,id=%s,ctr=%s,size=%s,RGB=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(rgb) ))
-                line="%s,id=%s,ctr=%s,size=%s,HSL=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsl) ))
+
+                line="%s,id=%s,ctr=%s,size=%s,RGB=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(rgb) )) #原版rgb
+                # line="%s,id=%s,ctr=%s,size=%s,HSL=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsl))) #rgb换成hsl
+                # line="%s(relevant to %s),id=%s,ctr=%s,size=%s,HSL=%s" %(obj['label'], id_to_name_in_description[obj['id']], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsl) )) # 格式：name=原名称(description里的名称)
+                # if id_to_name_in_description[obj['id']]=='room':
+                #     name=obj['label']
+                # else:
+                #     name=id_to_name_in_description[obj['id']]
+                # line="%s,id=%s,ctr=%s,size=%s,HSL=%s" %(name, obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsl) )) # 格式：name=description里的名称
+
                 
             prompt=prompt+line+direction_info
 
@@ -891,7 +925,7 @@ class Refer3d:
 
             # 对于scanrefer，按iou是否超过阈值来判断
             else:
-                target_id_text=str(target_id) + "(ScanNet) / "+str(iou_max_object['id']) + "(GroupFree)"
+                target_id_text=str(target_id) + "(ScanNet) / "+str(iou_max_object['id']) + "(%s)"%self.scanrefer_tool_name
                 if iou>self.scanrefer_iou_thr:
                     answer_correct=True
                     print("answer correct: IoU=%.3f"%iou)
@@ -1506,8 +1540,7 @@ def main():
             'model': eval_config['model'],
             'temperature': 1e-7,
             'top_p': 1e-7,
-            # 'max_tokens': 4096,
-            'max_tokens':'inf',
+            'max_tokens': 8192,
             'system_message': system_message,
             # 'load_path': '',
             'save_path': 'chats',
@@ -1529,8 +1562,10 @@ def main():
                     scanrefer_tool_name=tool,
                     use_priority=eval_config['use_priority'],
                     use_code_interpreter=eval_config['use_code_interpreter'],
-                    object_filter_result_check_folder_name="eval_results_scanrefer_4_p_3dvista_valset",
-                    object_filter_result_check_list=["2023-11-07-00-31-39","2023-11-07-02-44-23", "2023-11-07-03-20-04"]
+                    # object_filter_result_check_folder_name="eval_results_scanrefer_4_p_3dvista_valset",
+                    # object_filter_result_check_list=["2023-11-07-00-31-39","2023-11-07-02-44-23", "2023-11-07-03-20-04"]
+                    object_filter_result_check_folder_name="eval_results_nr3d_4_p_testset",
+                    object_filter_result_check_list=['2023-11-12-06-28-53']
                     )
 
     ###############################################################################

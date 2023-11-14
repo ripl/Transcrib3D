@@ -33,10 +33,8 @@ class ObjectFilter(Dialogue):
         'temperature': 0,
         'top_p': 0.0,
         'max_tokens': 'inf',
-        'load_path': './object_filter_pretext.json',
-        # 'system_message': "You'll receive two inputs: a description & a list of objects. Your job is to find all relevant objects from this list according to a description.\nA defination of 'relevant' - obj1 and obj2 are relevant if one of the following is true: \n1.obj1 and obj2 have exactly the same name; \n2.obj1 and obj2 are synonyms(e.g. 'desk' and 'table', 'trashcan' and 'recycling bin', 'couch' and 'sofa'); \n3.obj1 is a abbreviation of obj2 (e.g. 'fridge' and 'refrigerator', 'tv' and 'television'); \n4. obj1 and obj2 are closely related conceptual categories (e.g. 'cabinet' and 'kitchen cabinet', 'coffee table' and 'end table', 'sofa chair' and 'chair').\nSo desk and table are relevant, trash can and recycling bin are relevant, couch and sofa are relevant, fridge and refridgerator are relevant, cabinet and kitchen cabinet are relevant, coffee table and  end table are relevant, sofa chair, chair and sofa are relevant.\nYou should follow these steps:\n1. Identify all objects in description. Note that objects could include 'man''wall', but not include 'viewer''observer'.\n2. Go through the object list to check each object, if it is relevant to any object in description, pick it out, and keep going until you finish the whole list. You should output 'name id:relevant'/'name id:not' for each object.\n3. For each object in description, output the ids of objects relevant to it. If no relevant object of it found, double check the list and find some that are most possibly relevant, and pick them out.\n4. Summarize the ids of all the ids (include possibly relevant) in step 3 and put them into one list, then add 'Here is the list of relevant objects ids -- [id1,id2,...idn]' to the end of your answer(in a new line, strictly follow the format)\nYou should tell me the result of each step above. " ,
-        'system_message': "You'll receive two inputs: a description & a list of objects. Your job is to find all relevant objects from this list according to a description.\nA defination of 'relevant' - obj1 and obj2 are relevant if one of the following is true: \n1.obj1 and obj2 have exactly the same name; \n2.obj1 and obj2 are synonyms(e.g. 'desk' and 'table', 'trashcan' and 'recycling bin', 'couch' and 'sofa'); \n3.obj1 is a abbreviation of obj2 (e.g. 'fridge' and 'refrigerator', 'tv' and 'television'); \n4. obj1 and obj2 are closely related conceptual categories (e.g. 'cabinet' and 'kitchen cabinet'; 'coffee table' and 'end table'; 'sofa chair''chair''couch' and 'sofa').\nSo desk and table are relevant; trash can and recycling bin are relevant; couch and sofa are relevant; fridge and refridgerator are relevant; cabinet and kitchen cabinet are relevant; coffee table and end table are relevant; sofa chair, chair, couch and sofa are relevant.\nYou should follow these steps:\n1. Identify all objects in description. Note that objects could include 'man''wall', but not include 'viewer''observer'.\n2. Go through the object list to check each object, if it is relevant to any object in description, pick it out, and keep going until you finish the whole list. You should output 'name id:relevant'/'name id:not' for each object.\n3. For each object in description, output the ids of objects relevant to it. If no relevant object of it found, double check the list and find some that are most possibly relevant, and pick them out.\n4. Summarize all the ids and the object names they are relevant to(include possibly relevant) in step 3 and put them into one dictionary, then add 'Here is the dictionary of relevant objects ids and the names-- {'name1':[id1,id2,...],...,'nameM':[id1,id2,...]}' to the end of your answer(in a new line, strictly follow the format)\nYou should tell me the result of each step above. " ,
-        'save_path': 'chats',
+        # 'load_path': './object_filter_pretext.json',
+        'load_path': './object_filter_pretext_new.json',
         'debug': False
         }
         super().__init__(**config)
@@ -65,8 +63,26 @@ class ObjectFilter(Dialogue):
 
         return int_lists
 
+    def extract_dict_from_text(self,text) ->dict:
+        # Use regular expression to match the dictionary in the text
+        match = re.search(r'{\s*(.*?)\s*}', text)
+        if match:
+            # Get the matched dictionary content
+            dict_str = match.group(1)
+            # Convert the dictionary string to an actual dictionary object
+            try:
+                result_dict = eval('{' + dict_str + '}')
+                return result_dict
+            except Exception as e:
+                print(f"Error converting string to dictionary: {e}")
+                return None
+        else:
+            print("No dictionary found in the given text.")
+            return None
+
     @retry(wait=wait_exponential_jitter(initial=20, max=120, jitter=20), stop=stop_after_attempt(5), before_sleep=before_sleep_log(logger,logging.ERROR)) #20s,40s,80s,120s + random.uniform(0,20)
     def filter_objects_by_description(self,description,use_npy_file,objects_info_path=None,object_info_list=None,to_print=True):
+        # first, create the prompt
         print("looking for relevant objects based on description:\n%s"%description)
         prompt=""
         prompt=prompt+"description:\n'%s'\nobject list:\n"%description
@@ -92,32 +108,21 @@ class ObjectFilter(Dialogue):
                 prompt=prompt+line
         
         
-        # print("prompt: ",prompt)
-        # response=self.get_gpt_response(prompt)
+        # get response from gpt
         response,token_usage=self.call_openai(prompt)
         response=response['content']
         # print("response:",response)
         last_line = response.splitlines()[-1] if len(response) > 0 else ''
 
-        # last_line_split=last_line.split('--')[-1]
-
-        # # 找到方括号内的列表部分
-        # start_index = last_line_split.find('[')
-        # end_index = last_line_split.find(']')
-        # list_str = last_line_split[start_index:end_index + 1]
-
-        # # 将字符串转换为列表
-        # list_elements = eval(list_str)
-
-        # # 检查列表中的元素是否都是整数
-        # all_integers = all(isinstance(elem, int) for elem in list_elements)
-
-        list_elements=self.extract_all_int_lists_from_text(last_line)
+        # exract answer(list/dict) from the last line of response
+        # answer=self.extract_all_int_lists_from_text(last_line)
+        answer=self.extract_dict_from_text(last_line)
         if to_print:
             self.print_pretext()
-            print("answer:",list_elements)
+            print("answer:",answer)
             print("\n\n")
-        answer=list_elements if len(list_elements)!=0 else None
+        if len(answer)==0:
+            answer=None
         return answer,token_usage
     
 
