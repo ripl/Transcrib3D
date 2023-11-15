@@ -118,9 +118,9 @@ write_jsonl(all_refer_success_messages[380:], all_refer_success_val_fn)
 
 # setting 2
 all_refer_success_correction_train_fn = "finetune_files/all_refer_success_correction_train.jsonl"
-write_jsonl(all_refer_success_messages[:500], all_refer_success_correction_train_fn)
+write_jsonl(all_refer_success_correction_messages[:500], all_refer_success_correction_train_fn)
 all_refer_success_correction_val_fn = "finetune_files/all_refer_success_correction_val.jsonl"
-write_jsonl(all_refer_success_messages[500:], all_refer_success_correction_val_fn)
+write_jsonl(all_refer_success_correction_messages[500:], all_refer_success_correction_val_fn)
 
 # setting 3
 no_rules_all_refer_success_train_fn = "finetune_files/no_rules_all_refer_success_train.jsonl"
