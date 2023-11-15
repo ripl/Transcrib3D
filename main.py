@@ -897,14 +897,15 @@ class Refer3d:
 
             elif prompt == -1:
                 with open(process_log_file, 'a') as f:
-                    f.write("Human failed to find this object: '%s'. Skipped." % utterance)
+                    # f.write("Human failed to find this object: '%s'. Skipped." % utterance)
+                    f.write("Human failed to find object, line number '%s'. Skipped." % line_number)
                 continue
 
             elif prompt == -2:
                 with open(process_log_file, 'a') as f:
-                    f.write("Not mention target class '%s'. Skipped." % utterance)
+                    f.write("Not mention target class, line number: '%s'. Skipped." % line_number)
                 continue
-
+                
             # read some information from info
             if self.dataset == 'sr3d':
                 scan_id, target_id, target_class, distractor_ids, reference_type, utterance, anchor_has_front = info
@@ -1078,7 +1079,7 @@ class Refer3d:
         # 删除gpt之前的错误推理，并让其完整输出推理过程
         print("\nregenerating reasoning process...\n")
         del code_interpreter.pretext[2:failure_dialogue_length]
-        regenerate_prompt = "Now you have the correct reasoning and result. Can you generate the whole reasonging process to get this correct answer from the very beginning? You cannot use the code execution result above and have to generate code when needed. When answer step by step, stop whenever you feel there is need to generate python code and wait for the result from the code execution. Remember to use print() function to print out the result and keep two decimal places for numbers."
+        regenerate_prompt = "Now you have the correct reasoning and result. Can you generate the whole reasoning process to get this correct answer from the very beginning? Do not mention that you know the correct answer. You cannot use the code execution result above and have to generate code when needed.  When answer step by step, stop whenever you feel there is need to generate python code and wait for the result from the code execution. Remember to use print() function to print out the result and keep two decimal places for numbers."
         print("regenerate prompt:", regenerate_prompt)
         response = self.get_gpt_response(regenerate_prompt, code_interpreter)
         print("--------------------------------------------")
