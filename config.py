@@ -372,6 +372,7 @@ confs_sr3d = {
         'use_priority': False,
         'use_code_interpreter': False
     },
+    # 3.5-turbo, sampled 1000, no CI
     16: {
         'dataset': 'sr3d',
         'model': 'gpt-3.5-turbo',
@@ -382,6 +383,7 @@ confs_sr3d = {
         'use_priority': False,
         'use_code_interpreter': False
     },
+    # 3.5-turbo, assembled 100x5, CI
     17: {
         'dataset': 'sr3d',
         'model': 'gpt-3.5-turbo',
@@ -392,10 +394,22 @@ confs_sr3d = {
         'use_priority': False,
         'use_code_interpreter': True
     },
+    # 3.5-turbo, assembled 100x5, no CI
     18: {
         'dataset': 'sr3d',
         'model': 'gpt-3.5-turbo',
         'result_folder_name': 'eval_results_sr3d_35_p_test_assembled/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/sr3d_test_assembled100x5.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    # 4-turbo, assembled 100x5, no CI
+    19: {
+        'dataset': 'sr3d',
+        'model': 'gpt-4-1106-preview',
+        'result_folder_name': 'eval_results_sr3d_4_p_test_assembled/',
         'use_principle': True,
         'refer_dataset_path': "./data/referit3d/sr3d_test_assembled100x5.csv",
         'use_gt_box': True,
