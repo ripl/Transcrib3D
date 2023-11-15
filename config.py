@@ -71,6 +71,16 @@ confs_nr3d = {
         'use_priority': False,
         'use_code_interpreter': True
     },
+    106: {
+        'dataset': 'nr3d',
+        'model': 'gpt-4-1106-preview',  # nr3d gpt-4-turbo train set
+        'result_folder_name': 'eval_results_nr3d_4_p_trainset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_train_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
     7: {
         'dataset': 'nr3d',
         'model': 'meta-llama/Llama-2-7b-chat-hf',
