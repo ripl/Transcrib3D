@@ -99,27 +99,27 @@ class Refer3d:
                 zmax = z
         return self.round_list([(xmin + xmax) / 2, (ymin + ymax) / 2, (zmin + zmax) / 2], 2)
 
-    def get_scanrefer_camera_info_aligned(self,scan_id,object_id,annotation_id):
+    def get_scanrefer_camera_info_aligned(self, scan_id, object_id, annotation_id):
         """Return camera info which is axis aligned"""
-        json_path=os.path.join(self.script_root,'data/scanrefer_camera_info','%s.anns.json'%scan_id)
+        json_path = os.path.join(self.script_root, 'data/scanrefer_camera_info', '%s.anns.json' % scan_id)
         with open(json_path) as f:
-            data=json.load(f)
+            data = json.load(f)
         target_annotation = [d for d in data if d['object_id'] == object_id and d['ann_id'] == annotation_id]
         if target_annotation:
-            if len(target_annotation)>1:
-                print("%d camera info found! Returning the first one. scan_id=%s, object_id=%s, annotation_id=%s."%(len(target_annotation),scan_id,object_id,annotation_id))
+            if len(target_annotation) > 1:
+                print("%d camera info found! Returning the first one. scan_id=%s, object_id=%s, annotation_id=%s." % (len(target_annotation), scan_id, object_id, annotation_id))
             camera_info = target_annotation[0]['camera']
             position = camera_info['position']
             lookat = camera_info['lookat']
             # align the vectors(coordinates)
-            axis_align_matrix = self.get_axis_align_matrix(os.path.join(self.script_root, "data/scannet_scene_info", scan_id+".txt"))
-            position_aligned = np.dot(axis_align_matrix, np.append(position,1).reshape(4,1))[0:3].reshape(-1)
-            lookat_aligned = np.dot(axis_align_matrix, np.append(lookat,1).reshape(4,1))[0:3].reshape(-1)
-            camera_info_aligned={'position':position_aligned, 'lookat':lookat_aligned}
+            axis_align_matrix = self.get_axis_align_matrix(os.path.join(self.script_root, "data/scannet_scene_info", scan_id + ".txt"))
+            position_aligned = np.dot(axis_align_matrix, np.append(position, 1).reshape(4, 1))[0:3].reshape(-1)
+            lookat_aligned = np.dot(axis_align_matrix, np.append(lookat, 1).reshape(4, 1))[0:3].reshape(-1)
+            camera_info_aligned = {'position': position_aligned, 'lookat': lookat_aligned}
             return camera_info_aligned
-        
+
         else:
-            print("No camera info found! scan_id=%s, object_id=%s, annotation_id=%s."%(scan_id,object_id,annotation_id))
+            print("No camera info found! scan_id=%s, object_id=%s, annotation_id=%s." % (scan_id, object_id, annotation_id))
             return None
 
     def round_list(self, lst, length):
@@ -142,7 +142,7 @@ class Refer3d:
 
     def get_axis_align_matrix(self, txt_path):
         with open(txt_path, 'r') as file:
-            lines=file.readlines()
+            lines = file.readlines()
             for line in lines:
                 if "axisAlignment" in line:
                     numbers = line.split('=')[1].strip().split()
@@ -151,16 +151,16 @@ class Refer3d:
         return axis_align_matrix
 
     def filter_out_obj_behind_camera(self, obj_list, camera_info):
-        camera_position=camera_info['position']
-        camera_lookat=camera_info['lookat']
-        lookat_vec=camera_lookat-camera_position
-        obj_list_f=[]
+        camera_position = camera_info['position']
+        camera_lookat = camera_info['lookat']
+        lookat_vec = camera_lookat - camera_position
+        obj_list_f = []
         for obj in obj_list:
-            obj_vec=obj['center_position']-camera_position
-            if np.dot(lookat_vec,obj_vec)>=0:
+            obj_vec = obj['center_position'] - camera_position
+            if np.dot(lookat_vec, obj_vec) >= 0:
                 obj_list_f.append(obj)
-        print("Before filter_out_obj_behind_camera: %d objects."%len(obj_list))
-        print("After filter_out_obj_behind_camera: %d objects."%len(obj_list_f))
+        print("Before filter_out_obj_behind_camera: %d objects." % len(obj_list))
+        print("After filter_out_obj_behind_camera: %d objects." % len(obj_list_f))
         return obj_list_f
 
     def center_size_to_extension(self, box_center_size):
@@ -504,26 +504,26 @@ class Refer3d:
         if found:
             target_dialogue_path = folder_path + target_dialogue_name
             with open(target_dialogue_path) as f:
-                of_response=json.load(f)[-1]['content']
-                last_line=of_response.splitlines()[-1]
-            object_filter=ObjectFilter()
-            relevant_ids=object_filter.extract_all_int_lists_from_text(last_line)
-            relevant_dict=object_filter.extract_dict_from_text(last_line)
-            
+                of_response = json.load(f)[-1]['content']
+                last_line = of_response.splitlines()[-1]
+            object_filter = ObjectFilter()
+            relevant_ids = object_filter.extract_all_int_lists_from_text(last_line)
+            relevant_dict = object_filter.extract_dict_from_text(last_line)
+
         else:
             target_dialogue_path = None
-            if  self.gpt_config['model'] == 'gpt-4-1106-preview': # 如果refer model用4 turbo，那OF也用
+            if self.gpt_config['model'] == 'gpt-4-1106-preview':  # 如果refer model用4 turbo，那OF也用
                 model = 'gpt-4-1106-preview'
             else:
                 model = 'gpt-4'
-            print("model used in object filter:",model)
+            print("model used in object filter:", model)
             object_filter = ObjectFilter(model)
             of_start_time = time.time()
             # relevant_ids, token_usage_of = object_filter.filter_objects_by_description(description=utterance, use_npy_file=use_npy_file, objects_info_path=npy_path,object_info_list=object_info_list, to_print=True)
-            relevant_dict,token_usage_of=object_filter.filter_objects_by_description(description=utterance,use_npy_file=use_npy_file, objects_info_path=npy_path,object_info_list=object_info_list, to_print=True)
-            relevant_ids=[]
+            relevant_dict, token_usage_of = object_filter.filter_objects_by_description(description=utterance, use_npy_file=use_npy_file, objects_info_path=npy_path, object_info_list=object_info_list, to_print=True)
+            relevant_ids = []
             for lst in relevant_dict.values():
-                relevant_ids+=lst
+                relevant_ids += lst
 
             # 统计时间和token
             of_end_time = time.time()
@@ -583,7 +583,7 @@ class Refer3d:
         # 读入scanrefer的一些信息
         else:
             annotation_id = data['ann_id']
-            camera_info_aligned=self.get_scanrefer_camera_info_aligned(scan_id,target_id,annotation_id)
+            camera_info_aligned = self.get_scanrefer_camera_info_aligned(scan_id, target_id, annotation_id)
 
         # 读入事先准备好的物体信息，即npy文件
         npy_path_train = os.path.join(self.scannet_data_root, "objects_info_%s" % self.scanrefer_tool_name, "objects_info_%s_%s.npy" % (self.scanrefer_tool_name, scan_id)) if (self.dataset == 'scanrefer' and not self.use_gt_box) else os.path.join(self.scannet_data_root, "objects_info", "objects_info_%s.npy" % scan_id)
@@ -635,14 +635,12 @@ class Refer3d:
 
         else:
             # relevant_ids,object_filter,target_dialogue_path=self.find_relevant_objects(data_index,scan_id,target_id,utterance,npy_path)
-            relevant_ids,relevant_dict,object_filter,target_dialogue_path=self.find_relevant_objects(data_index,scan_id,target_id,utterance,npy_path,use_npy_file=False,object_info_list=objects_info)
+            relevant_ids, relevant_dict, object_filter, target_dialogue_path = self.find_relevant_objects(data_index, scan_id, target_id, utterance, npy_path, use_npy_file=False, object_info_list=objects_info)
             # create a mapping from id to the relevant obj name in description
-            id_to_name_in_description={}
-            for name,ids in relevant_dict.items():
+            id_to_name_in_description = {}
+            for name, ids in relevant_dict.items():
                 for id in ids:
-                    id_to_name_in_description[id]=name
-
-
+                    id_to_name_in_description[id] = name
 
             # objects_related = objects_info if (relevant_ids is None) else objects_info[relevant_ids]
             objects_related = objects_info if (relevant_ids is None) else [obj for obj in objects_info if obj['id'] in relevant_ids]
@@ -669,6 +667,7 @@ class Refer3d:
                 prompt = prompt + "Observer position:%s.\n" % self.remove_spaces(str(self.round_list(camera_info_aligned['position'], 2)))
 
         prompt = prompt + "objs list:\n"
+        lines = []
         # 生成prompt中对物体的定量描述部分（遍历所有相关物体）
         for obj in objects_related:
             # 位置信息，保留2位小数
@@ -681,7 +680,7 @@ class Refer3d:
             extension = obj['extension']
             extension = self.round_list(extension, 2)
             # 方向信息，用方向向量表示. 注意，scanrefer由于用的不是scannet原始obj id，所以不能用方向信息
-            if obj['has_front'] and self.dataset!='scanrefer': 
+            if obj['has_front'] and self.dataset != 'scanrefer':
                 front_point = np.array(obj['front_point'])
                 center = np.array(obj['obb'][0:3])
                 direction_vector = front_point - center
@@ -715,22 +714,22 @@ class Refer3d:
 
             # nr3d和scanrefer，给出center、size、color
             else:
-                rgb=obj['median_rgba'][0:3] if (self.dataset=='scanrefer' and not self.use_gt_box) else obj['avg_rgba'][0:3]
-                hsl=self.round_list(self.rgb_to_hsl(rgb),2)
+                rgb = obj['median_rgba'][0:3] if (self.dataset == 'scanrefer' and not self.use_gt_box) else obj['avg_rgba'][0:3]
+                hsl = self.round_list(self.rgb_to_hsl(rgb), 2)
 
                 # line="%s,id=%s,ctr=%s,size=%s,RGB=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(rgb) )) #原版rgb
                 # line="%s,id=%s,ctr=%s,size=%s,HSL=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsl))) #rgb换成hsl
-                line="%s(relevant to %s),id=%s,ctr=%s,size=%s,HSL=%s" %(obj['label'], id_to_name_in_description[obj['id']], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsl) )) # 格式：name=原名称(description里的名称)
+                line = "%s(relevant to %s),id=%s,ctr=%s,size=%s,HSL=%s" % (obj['label'], id_to_name_in_description[obj['id']], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsl)))  # 格式：name=原名称(description里的名称)
                 # if id_to_name_in_description[obj['id']]=='room':
                 #     name=obj['label']
                 # else:
                 #     name=id_to_name_in_description[obj['id']]
                 # line="%s,id=%s,ctr=%s,size=%s,HSL=%s" %(name, obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsl) )) # 格式：name=description里的名称
-
-                
-            prompt=prompt+line+direction_info
-
-
+            lines.append(line + direction_info)
+        if self.obj_info_ablation_type == 4:
+            random.seed(0)
+            random.shuffle(lines)
+        prompt += ''.join(lines)
         # prompt中的要求
         line = "Instruction:find the one described object in description: \n\"%s\"\n" % utterance
         prompt = prompt + line
@@ -1016,11 +1015,11 @@ class Refer3d:
 
             # 对于scanrefer，按iou是否超过阈值来判断
             else:
-                target_id_text=str(target_id) + "(ScanNet) / "+str(iou_max_object['id']) + "(%s)"%self.scanrefer_tool_name
-                if iou>self.scanrefer_iou_thr:
-                    answer_correct=True
-                    print("answer correct: IoU=%.3f"%iou)
-                    #记录正确信息
+                target_id_text = str(target_id) + "(ScanNet) / " + str(iou_max_object['id']) + "(%s)" % self.scanrefer_tool_name
+                if iou > self.scanrefer_iou_thr:
+                    answer_correct = True
+                    print("answer correct: IoU=%.3f" % iou)
+                    # 记录正确信息
                     self.log_info(line_number, scan_id, utterance, object_filter.printed_pretext, code_interpreter.printed_pretext, success_log_file, target_id_text, answer_id, iou, iou_max)
                     with open(process_log_file, 'a') as f:
                         f.write("answer correct. iou=%.3f" % iou)
@@ -1295,6 +1294,7 @@ class Refer3d:
             total = accuracy_count["count_" + name]
             percentage = -1 if total == 0 else correct / total * 100
             print("%.2f%% (%d/%d)" % (percentage, correct, total))
+        print(f' & {round(accuracy_count["correct_count_horizontal"]/accuracy_count["count_horizontal"]*100, 1)} & {round(accuracy_count["correct_count_vertical"]/accuracy_count["count_vertical"]*100, 1)} & {round(accuracy_count["correct_count_support"]/accuracy_count["count_support"]*100, 1)} & {round(accuracy_count["correct_count_between"]/accuracy_count["count_between"]*100, 1)} & {round(accuracy_count["correct_count_allocentric"]/accuracy_count["count_allocentric"]*100, 1)} & {round(accuracy_count["correct_count_total"]/accuracy_count["count_total"]*100, 1)}\\\\')
 
     def analyse_result_nr3d(self, result_path, skip_human_wrong_cases=True):
         # 本函数用于分析nr3d的结果
@@ -1555,6 +1555,7 @@ def find_number_list_in_log(log_file):
     print(numbers_a)
     return numbers_a
 
+
 def find_number_list_in_failure_log(log_file):
     line_numbers = []
 
@@ -1571,6 +1572,7 @@ def find_number_list_in_failure_log(log_file):
             else:
                 i += 1
     return line_numbers
+
 
 def random_sampling(lower, upper, mode, para):
     if mode == 'rate':
@@ -1600,7 +1602,7 @@ def parse_args():
     parser.add_argument("--range", type=int, nargs='*', help="Range of line numbers of the refering dataset(will be fed to np.arange()). For nr3d and sr3d, the minimum is 2. For scanrefer, the minimum is 0.")
     parser.add_argument("--line_numbers", type=int, nargs='*', help="When the 'range' parameter is not provided, you can specify non-contiguous line numbers here.")
     parser.add_argument("--ft", type=str, nargs='*', help="List of times in 'yy-mm-dd-HH-MM-SS' format. Requested for result mode.")
-    parser.add_argument("--obj-info-ablation-type", type=int, default=0, help="Type of ablation for sr3d. 0: no ablation; 1: no size; 2: min+max; 3: reversed; 4: shuffled.")
+    parser.add_argument("--obj-info-ablation-type", type=int, default=0, help="Type of ablation for sr3d. 0: no ablation; 1: no size; 2: min+max; 3: attributes reversed; 4: objects shuffled.")
     parser.add_argument("--use_camera_position", type=bool, default=True)
     parser.add_argument("--filter_behind_obj", type=bool, default=True)
 
