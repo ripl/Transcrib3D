@@ -661,10 +661,10 @@ class Refer3d:
             prompt = prompt + "Scene center:%s. If no direction vector, observer at center for obj orientation.\n" % self.remove_spaces(str(scene_center))
         elif self.dataset == 'scanrefer':
             if self.use_camera_position:
-                prompt = prompt + "Scene center:%s. If no direction vector, observer at center for obj orientation.\n" % self.remove_spaces(str(scene_center))
-            else:
                 prompt = prompt + "Scene center:%s.\n" % self.remove_spaces(str(scene_center))
-                prompt = prompt + "Observer position:%s.\n" % self.remove_spaces(str(self.round_list(camera_info_aligned['position'], 2)))
+                prompt = prompt + "Observer position:%s.\n" % self.remove_spaces(str(self.round_list(camera_info_aligned['position'], 2)))   
+            else:
+                prompt = prompt + "Scene center:%s. If no direction vector, observer at center for obj orientation.\n" % self.remove_spaces(str(scene_center))
 
         prompt = prompt + "objs list:\n"
         lines = []
@@ -1667,8 +1667,8 @@ def main():
                       use_priority=eval_config['use_priority'],
                       use_code_interpreter=eval_config['use_code_interpreter'],
 
-                      object_filter_result_check_folder_name="eval_results_scanrefer_4_p_gtbox_valset",
-                      object_filter_result_check_list=['2023-11-14-08-00-13'],
+                    #   object_filter_result_check_folder_name="eval_results_scanrefer_4_p_gtbox_valset",
+                    #   object_filter_result_check_list=['2023-11-14-08-00-13'],
                       obj_info_ablation_type=args.obj_info_ablation_type
                       )
 

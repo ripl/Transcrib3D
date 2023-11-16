@@ -33,7 +33,7 @@ class ObjectFilter(Dialogue):
         'model': model,
         'temperature': 0,
         'top_p': 0.0,
-        'max_tokens': 'inf',
+        'max_tokens': 8192,
         # 'load_path': './object_filter_pretext.json',
         'load_path': './object_filter_pretext_new.json',
         'debug': False
