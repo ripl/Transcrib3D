@@ -7,15 +7,15 @@ from openai import OpenAI
 client = OpenAI()
 # openai.api_key = "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"
 
-HUGGINGFACE_MODELS = {
-    'meta-llama/Llama-2-7b-chat-hf',
-    'meta-llama/Llama-2-13b-chat-hf',
-    'meta-llama/Llama-2-70b-chat-hf',
-    'codellama/CodeLlama-7b-Instruct-hf',
-    'codellama/CodeLlama-13b-Instruct-hf',
-    'codellama/CodeLlama-34b-Instruct-hf',
-    'mistralai/Mistral-7B-Instruct-v0.1',
-}
+# HUGGINGFACE_MODELS = {
+#     'meta-llama/Llama-2-7b-chat-hf',
+#     'meta-llama/Llama-2-13b-chat-hf',
+#     'meta-llama/Llama-2-70b-chat-hf',
+#     'codellama/CodeLlama-7b-Instruct-hf',
+#     'codellama/CodeLlama-13b-Instruct-hf',
+#     'codellama/CodeLlama-34b-Instruct-hf',
+#     'mistralai/Mistral-7B-Instruct-v0.1',
+# }
 
 
 class Dialogue:
@@ -32,7 +32,7 @@ class Dialogue:
         else:
             self.pretext = [{"role": "system", "content": self.system_message}]
 
-        if self.model in HUGGINGFACE_MODELS:
+        if 'llama' in self.model:
             from hf_conversational import HuggingfaceConversational
             from transformers import Conversation
             self.conversational = HuggingfaceConversational(
@@ -115,7 +115,7 @@ class Dialogue:
             assistant_response_message = {'role': raw_response_message.role, 'content': raw_response_message.content}
             # print('assistant_response_message: ', assistant_response_message)
             token_usage = completion.usage.total_tokens
-        elif self.model in HUGGINGFACE_MODELS:
+        elif 'llama' in self.model:
             chat_completion_messages,token_usage = self.conversational(messages)
             assistant_response_message = chat_completion_messages.messages[-1]
         else:
