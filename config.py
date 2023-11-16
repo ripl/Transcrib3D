@@ -215,6 +215,486 @@ confs_nr3d = {
         'use_code_interpreter': False,
         'use_object_filter': False,
     },
+    200: {
+        'dataset': 'nr3d',
+        'model': 'ft:gpt-3.5-turbo-1106:ripl::8LKEeL8m',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_gpt35_refer_success_p_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    201: {
+        'dataset': 'nr3d',
+        'model': 'ft:gpt-3.5-turbo-1106:ripl::8LKEeL8m',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_gpt35_refer_success_np_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    202: {
+        'dataset': 'nr3d',
+        'model': 'ft:gpt-3.5-turbo-1106:ripl::8LKnhl90',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_gpt35_refer_success_correction_p_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    203: {
+        'dataset': 'nr3d',
+        'model': 'ft:gpt-3.5-turbo-1106:ripl::8LKnhl90',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_gpt35_refer_success_correction_np_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    204: {
+        'dataset': 'nr3d',
+        'model': 'ft:gpt-3.5-turbo-1106:ripl::8LLmaMeG',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_gpt35_no_rule_refer_success_p_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    205: {
+        'dataset': 'nr3d',
+        'model': 'ft:gpt-3.5-turbo-1106:ripl::8LLmaMeG',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_gpt35_no_rule_refer_success_np_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    206: {
+        'dataset': 'nr3d',
+        'model': 'ft:gpt-3.5-turbo-1106:ripl::8LMeizps',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_gpt35_no_rule_refer_success_correction_p_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    207: {
+        'dataset': 'nr3d',
+        'model': 'ft:gpt-3.5-turbo-1106:ripl::8LMeizps',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_gpt35_no_rule_refer_success_correction_np_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False,
+    },
+    210: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/refer_success-codellama-7b-finetune-pad-eos',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_codellama_refer_success_p_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    211: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/refer_success-codellama-7b-finetune-pad-eos',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_codellama_refer_success_np_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    212: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/refer_success_correction-codellama-7b-finetune-pad-eos',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_codellama_refer_success_correction_p_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    213: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/refer_success_correction-codellama-7b-finetune-pad-eos',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_codellama_refer_success_correction_np_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    214: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/no_rules_refer_success-codellama-7b-finetune-pad-eos',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_codellama_no_rule_refer_success_p_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    215: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/no_rules_refer_success-codellama-7b-finetune-pad-eos',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_codellama_no_rule_refer_success_np_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    216: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/no_rules_refer_success_correction-codellama-7b-finetune-pad-eos',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_codellama_no_rule_refer_success_correction_p_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    217: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/no_rules_refer_success_correction-codellama-7b-finetune-pad-eos',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_codellama_no_rule_refer_success_correction_np_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    220: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/refer_success-llama2-7b-chat-finetune-pad-eos',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_llama2_refer_success_p_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    221: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/refer_success-llama2-7b-chat-finetune-pad-eos',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_llama2_refer_success_np_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    222: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/refer_success_correction-llama2-7b-chat-finetune-pad-eos',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_llama2_refer_success_correction_p_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    223: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/refer_success_correction-llama2-7b-chat-finetune-pad-eos',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_llama2_refer_success_correction_np_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    224: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/no_rules_refer_success-llama2-7b-chat-finetune-pad-eos',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_llama2_no_rule_refer_success_p_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    225: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/no_rules_refer_success-llama2-7b-chat-finetune-pad-eos',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_llama2_no_rule_refer_success_np_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    226: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/no_rules_refer_success_correction-llama2-7b-chat-finetune-pad-eos',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_llama2_no_rule_refer_success_correction_p_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    227: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/no_rules_refer_success_correction-llama2-7b-chat-finetune-pad-eos',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_llama2_no_rule_refer_success_correction_np_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': False
+    },
+    300: {
+        'dataset': 'nr3d',
+        'model': 'ft:gpt-3.5-turbo-1106:ripl::8LKEeL8m',  # finetuned model with principle, with code interpreter
+        'result_folder_name': 'eval_results_nr3d_gpt35_refer_success_p_code_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    301: {
+        'dataset': 'nr3d',
+        'model': 'ft:gpt-3.5-turbo-1106:ripl::8LKEeL8m',  # finetuned model no principle, with code interpreter
+        'result_folder_name': 'eval_results_nr3d_gpt35_refer_success_np_code_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    302: {
+        'dataset': 'nr3d',
+        'model': 'ft:gpt-3.5-turbo-1106:ripl::8LKnhl90',  # finetuned model with principle, with code interpreter
+        'result_folder_name': 'eval_results_nr3d_gpt35_refer_success_correction_p_code_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    303: {
+        'dataset': 'nr3d',
+        'model': 'ft:gpt-3.5-turbo-1106:ripl::8LKnhl90',  # finetuned model no principle, with code interpreter
+        'result_folder_name': 'eval_results_nr3d_gpt35_refer_success_correction_np_code_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    304: {
+        'dataset': 'nr3d',
+        'model': 'ft:gpt-3.5-turbo-1106:ripl::8LLmaMeG',  # finetuned model with principle, with code interpreter
+        'result_folder_name': 'eval_results_nr3d_gpt35_no_rule_refer_success_p_code_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    305: {
+        'dataset': 'nr3d',
+        'model': 'ft:gpt-3.5-turbo-1106:ripl::8LLmaMeG',  # finetuned model no principle, with code interpreter
+        'result_folder_name': 'eval_results_nr3d_gpt35_no_rule_refer_success_np_code_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    306: {
+        'dataset': 'nr3d',
+        'model': 'ft:gpt-3.5-turbo-1106:ripl::8LMeizps',  # finetuned model with principle, with code interpreter
+        'result_folder_name': 'eval_results_nr3d_gpt35_no_rule_refer_success_correction_p_code_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    307: {
+        'dataset': 'nr3d',
+        'model': 'ft:gpt-3.5-turbo-1106:ripl::8LMeizps',  # finetuned model no principle, with code interpreter
+        'result_folder_name': 'eval_results_nr3d_gpt35_no_rule_refer_success_correction_np_code_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True,
+    },
+    310: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/refer_success-codellama-7b-finetune-pad-eos',  # finetuned model with principle, with code interpreter
+        'result_folder_name': 'eval_results_nr3d_codellama_refer_success_p_code_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    311: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/refer_success-codellama-7b-finetune-pad-eos',  # finetuned model no principle, with code interpreter
+        'result_folder_name': 'eval_results_nr3d_codellama_refer_success_np_code_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    312: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/refer_success_correction-codellama-7b-finetune-pad-eos',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_codellama_refer_success_correction_p_code_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    313: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/refer_success_correction-codellama-7b-finetune-pad-eos',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_codellama_refer_success_correction_np_code_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    314: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/no_rules_refer_success-codellama-7b-finetune-pad-eos',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_codellama_no_rule_refer_success_p_code_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    315: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/no_rules_refer_success-codellama-7b-finetune-pad-eos',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_codellama_no_rule_refer_success_np_code_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    316: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/no_rules_refer_success_correction-codellama-7b-finetune-pad-eos',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_codellama_no_rule_refer_success_correction_p_code_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    317: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/no_rules_refer_success_correction-codellama-7b-finetune-pad-eos',  # finetuned model no principle, with code interpreter
+        'result_folder_name': 'eval_results_nr3d_codellama_no_rule_refer_success_correction_np_code_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    320: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/refer_success-llama2-7b-chat-finetune-pad-eos',  # finetuned model with principle, with code interpreter
+        'result_folder_name': 'eval_results_nr3d_llama2_refer_success_p_code_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    321: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/refer_success-llama2-7b-chat-finetune-pad-eos',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_llama2_refer_success_np_code_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    322: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/refer_success_correction-llama2-7b-chat-finetune-pad-eos',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_llama2_refer_success_correction_p_code_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    323: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/refer_success_correction-llama2-7b-chat-finetune-pad-eos',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_llama2_refer_success_correction_np_code_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    324: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/no_rules_refer_success-llama2-7b-chat-finetune-pad-eos',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_llama2_no_rule_refer_success_p_code_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    325: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/no_rules_refer_success-llama2-7b-chat-finetune-pad-eos',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_llama2_no_rule_refer_success_np_code_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    326: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/no_rules_refer_success_correction-llama2-7b-chat-finetune-pad-eos',  # finetuned model with principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_llama2_no_rule_refer_success_correction_p_code_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    327: {
+        'dataset': 'nr3d',
+        'model': 'checkpoints/no_rules_refer_success_correction-llama2-7b-chat-finetune-pad-eos',  # finetuned model no principle, no code interpreter
+        'result_folder_name': 'eval_results_nr3d_llama2_no_rule_refer_success_correction_np_code_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
 }
 
 confs_sr3d = {
