@@ -1081,7 +1081,6 @@ confs_scanrefer = {
         'use_gt_box': False,
         'use_priority': False,
         'use_code_interpreter': True,
-        'tool': '3dvista_200c_wof'
     },
     109: {
         'dataset': 'scanrefer',
@@ -1092,6 +1091,5 @@ confs_scanrefer = {
         'use_gt_box': False,
         'use_priority': False,
         'use_code_interpreter': True,
-        'tool': '3dvista_200c_wof'
     },
 }
