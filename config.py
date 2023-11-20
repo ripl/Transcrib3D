@@ -719,6 +719,26 @@ confs_sr3d = {
         'use_priority': False,
         'use_code_interpreter': True
     },
+    100: {
+        'dataset': 'sr3d',
+        'model': 'gpt-4-1106-preview',  # 4 no principle
+        'result_folder_name': 'eval_results_sr3d_4tb_np_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/sr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    101: {
+        'dataset': 'sr3d',
+        'model': 'gpt-4-1106-preview',  # 4 with principle
+        'result_folder_name': 'eval_results_sr3d_4tb_p_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/sr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
     2: {
         'dataset': 'sr3d',
         'model': 'gpt-3.5-turbo',  # 3.5 zero shot no principle
@@ -1025,6 +1045,50 @@ confs_scanrefer = {
         'result_folder_name': 'eval_results_scanrefer_4tb_p_3dvista_valset/',
         'use_principle': True,
         'refer_dataset_path': "./data/scanrefer/ScanRefer_filtered_val_sampled1000.json",
+        'use_gt_box': False,
+        'use_priority': False,
+        'use_code_interpreter': True,
+        'tool': '3dvista_200c_wof'
+    },
+    8: {
+        'dataset': 'scanrefer',
+        'model': 'gpt-4',  # full eval on gpt-4 with detected box
+        'result_folder_name': 'eval_results_scanrefer_4_p_3dvista_valset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/scanrefer/ScanRefer_filtered_val.json",
+        'use_gt_box': False,
+        'use_priority': False,
+        'use_code_interpreter': True,
+        'tool': '3dvista_200c_wof'
+    },
+    108: {
+        'dataset': 'scanrefer',
+        'model': 'gpt-4-1106-preview',  # full eval on gpt-4-turbo with detected box
+        'result_folder_name': 'eval_results_scanrefer_4tb_p_3dvista_valset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/scanrefer/ScanRefer_filtered_val.json",
+        'use_gt_box': False,
+        'use_priority': False,
+        'use_code_interpreter': True,
+        'tool': '3dvista_200c_wof'
+    },
+    9: {
+        'dataset': 'scanrefer',
+        'model': 'gpt-4',  # full eval on gpt-4 with gt box
+        'result_folder_name': 'eval_results_scanrefer_4tb_p_gtbox_valset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/scanrefer/ScanRefer_filtered_val.json",
+        'use_gt_box': False,
+        'use_priority': False,
+        'use_code_interpreter': True,
+        'tool': '3dvista_200c_wof'
+    },
+    109: {
+        'dataset': 'scanrefer',
+        'model': 'gpt-4-1106-preview',  # full eval on gpt-4-turbo with gt box
+        'result_folder_name': 'eval_results_scanrefer_4tb_p_gtbox_valset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/scanrefer/ScanRefer_filtered_val.json",
         'use_gt_box': False,
         'use_priority': False,
         'use_code_interpreter': True,
