@@ -4,7 +4,17 @@ This code repository is for internal testing only, please forgive some of its im
 
 ## Install
 
-For evaluation, only some simple packages were used, include *numpy*, *openai* and *tenacity*.
+For evaluation, only some simple packages are required, include *numpy*, *openai* and *tenacity*.
+
+```bash
+pip install numpy openai tenacity
+```
+
+Some additional packages are required for data preprocessing:
+
+```bash
+pip install plyfile scikit-learn scipy pandas
+```
 
 ## OpenAI API access
 Set up your OpenAI api key as an environment variable `OPENAI_API_KEY`.
@@ -36,7 +46,9 @@ Implements the object filter which filters out irrelevant object according to th
 ## Evaluation
 Run the first 50 data records of *nr3d_test_sampled1000.csv* with config index 1:
 
-`python main.py --scannet_data_root /path/to/ScanNet/Data/ --script_root /path/to/Transcribe3D/project/folder --mode eval --dataset nr3d --conf_idx 1 --range 2 52`
+```bash
+python main.py --workspace_path /path/to/Transcribe3D/project/folder --scannet_data_root /path/to/ScanNet/Data/  --mode eval --dataset nr3d --conf_idx 1 --range 2 52
+```
 
 Remember to replace the paths.
 
@@ -57,15 +69,21 @@ You might run one or more experiments of a evaluation configuration, and get som
 
 Specify the formatted time(s) after the --ft setting:
 
-`python main.py --scannet_data_root /path/to/ScanNet/Data/ --script_root /path/to/Transcribe3D/project/folder/ --mode result --dataset nr3d --conf_idx 1 --ft time1 time2`
+```bash
+python main.py --workspace_path /path/to/Transcribe3D/project/folder/ --scannet_data_root /path/to/ScanNet/Data/  --mode result --dataset nr3d --conf_idx 1 --ft time1 time2
+```
 
 ## Self Correction
 This checks all the result dialogues given formatted time(s), self-corrects those wrong cases.
 
-`python main.py --scannet_data_root /path/to/ScanNet/Data/ --script_root /path/to/Transcribe3D/project/folder --mode self_correct --dataset nr3d --conf_idx 1 --ft time1 time2`
+```bash
+python main.py --scannet_data_root /path/to/ScanNet/Data/ --script_root /path/to/Transcribe3D/project/folder --mode self_correct --dataset nr3d --conf_idx 1 --ft time1 time2
+```
 
 ## Check Scanrefer
 
 Check the how many cases are provided with detected boxes that has 0.5 or higher iou with gt box, which indicates the upper bound of performance on Scanrefer.
 
-`python main.py --scannet_data_root /path/to/ScanNet/Data/ --script_root /path/to/Transcribe3D/project/folder --mode check_scanrefer --dataset scanrefer --conf_idx 1`
+```bash
+python main.py --workspace_path /path/to/Transcribe3D/project/folder/ --scannet_data_root /path/to/ScanNet/Data/ --mode check_scanrefer --dataset scanrefer --conf_idx 1
+```

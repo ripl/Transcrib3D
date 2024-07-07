@@ -392,10 +392,19 @@ class Transcrib3D:
 
     def generate_prompt(self, data_index, to_print=True, deal_with_human_wrong_case=False, deal_with_not_mention_target_class=False):
         """
-        对于sr3d/nr3d/scanrefer中的指定数据，返回compressed prompt以及其他相关信息
-        """
+        Generate prompt for one piece of data record defined by data_index.
+        
+        Parameters:
+            data_index (int): Index of self.sr3d_data/nr3d_data/scanrefer_data. Starts from 0.
+            to_print (bool, optional): To print out the generated prompt or not. Defaults to True.
+            deal_with_human_wrong_case (bool, optional): For nr3d, whether to deal with cases that human did not answer correctly. Recorded in data['correct_guess']. Defaults to False.
+            deal_with_not_mention_target_class (bool, optional): For nr3d, whether to deal with cases that the utterance does not contain the object class name. Recorded in data['mentions_target_class']. Defaults to False.
 
-        # 读取指定行的数据，如果数据中的correct_guess为FALSE则返回-1
+        Returns:
+            str: The generated prompt.
+            tuple: A tuple of some information of this case.
+            list: A list of IDs of relevant objects. Only used for nr3d and scanrefer.
+        """
         # read in data with the given data_index
         if self.dataset_type == 'sr3d':
             data = self.sr3d_data[data_index]
@@ -453,11 +462,11 @@ class Transcrib3D:
         npy_path = npy_path_train
         objects_info = np.load(npy_path, allow_pickle=True)  # objects_info是gt或3d segmentation得到的场景中所有物体的信息
 
-        # 如果是scanrefer且给了camera position和lookat，那么滤掉camera后面的物体
+        # For scanrefer, filter out the objects in the half space behind the camera.
         if self.dataset_type == 'scanrefer' and self.use_camera_position and self.filter_behind_obj:
             objects_info = self.filter_out_obj_behind_camera(objects_info, camera_info_aligned)
 
-        # 如果是scanrefer且不用gt box，要根据confidential score筛选一下
+        # For scanrefer, if ground truth boxes are not used, we have to filter out boxes with low confidential scores and conduct non-max suppression
         if self.dataset_type == 'scanrefer' and not self.use_gt_box:
             objects_info_f = []
             for obj in objects_info:
@@ -477,7 +486,7 @@ class Transcrib3D:
         # is_unique=True if obj_idx_in_scene.count(target_idx)<=1 else False
         is_unique = True
 
-        # 如果是sr3d就只需要target，distractor和anchor，不用object filter
+        # For sr3d, relevant objects include the target, the distractors, and the anchors.
         if self.dataset_type == 'sr3d':
             objects_related = []
             anchor_has_front = True
@@ -487,17 +496,16 @@ class Transcrib3D:
             for id in anchor_ids:
                 objects_related.append(objects_info[int(id)])
                 anchor_has_front = anchor_has_front and objects_info[int(id)]['has_front']
-
+            # TODO: sort objects by id?
+            
+        # For nr3d and scanrefer, use object filter to find relevant objects.
         else:
-            # relevant_ids,object_filter,target_dialogue_path=self.find_relevant_objects(data_index,scan_id,target_id,utterance,npy_path)
             relevant_ids, relevant_dict, object_filter, target_dialogue_path = self.find_relevant_objects(data_index, scan_id, target_id, utterance, npy_path, use_npy_file=False, object_info_list=objects_info)
             # create a mapping from id to the relevant obj name in description
             id_to_name_in_description = {}
             for name, ids in relevant_dict.items():
                 for id in ids:
                     id_to_name_in_description[id] = name
-
-            # objects_related = objects_info if (relevant_ids is None) else objects_info[relevant_ids]
             objects_related = objects_info if (relevant_ids is None) else [obj for obj in objects_info if obj['id'] in relevant_ids]
 
         # # 对于sr3d记录anchor_has_front
@@ -506,11 +514,10 @@ class Transcrib3D:
         #     for id in anchor_ids:
         #         anchor_has_front=anchor_has_front and objects_info[int(id)]['has_front']
 
-        # 获取场景的中心坐标
-        # scene_center=get_scene_center(objects_related)
-        scene_center = get_scene_center(objects_info)  # 注意这里应该用所有物体的信息，而不只是relevant
+        # get the center of the scene
+        scene_center = get_scene_center(objects_info)
 
-        # 生成prompt中的背景信息部分
+        # Generate the background part of the prompt
         prompt = scan_id + ":objs with quant description based on r-h Cartesian coord sys with x-y-z axes, x-y plane=ground, z-axis=up/down. coords format [x, y, z].\n"
         if self.dataset_type == 'nr3d':
             prompt = prompt + "Scene center:%s. If no direction vector, observer at center for obj orientation.\n" % remove_spaces(str(scene_center))
@@ -521,39 +528,39 @@ class Transcrib3D:
             else:
                 prompt = prompt + "Scene center:%s. If no direction vector, observer at center for obj orientation.\n" % remove_spaces(str(scene_center))
 
+        #Iterate through relevant objects and generate quantatitive description.
         prompt = prompt + "objs list:\n"
         lines = []
-        # 生成prompt中对物体的定量描述部分（遍历所有相关物体）
         for obj in objects_related:
-            # 位置信息，保留2位小数
+            # position
             center_position = obj['center_position']
             center_position = round_list(center_position, 2)
-            # size信息，保留2位小数
+            # size
             size = obj['size']
             size = round_list(size, 2)
-            # extension信息，保留2位小数
+            # extension
             extension = obj['extension']
             extension = round_list(extension, 2)
-            # 方向信息，用方向向量表示. 注意，scanrefer由于用的不是scannet原始obj id，所以不能用方向信息
+            # direction vector. only used for some objects in sr3d and nr3d
             if obj['has_front'] and self.dataset_type != 'scanrefer':
+                # front vector
                 front_point = np.array(obj['front_point'])
                 center = np.array(obj['obb'][0:3])
                 direction_vector = front_point - center
                 direction_vector_normalized = direction_vector / np.linalg.norm(direction_vector)
-                # 再计算左和右的方向向量，全部保留两位小数
+                # left and right vector
                 front_vector = round_list(direction_vector_normalized, 2)
                 up_vector = np.array([0, 0, 1])
-                left_vector = round_list(np.cross(direction_vector_normalized, up_vector), 2)
+                left_vector = round_list(np.cross(direction_vector_normalized, up_vector), 2) # the left side when observer faces the front of the object
                 right_vector = round_list(np.cross(up_vector, direction_vector_normalized), 2)
                 behind_vector = round_list(-np.array(front_vector), 2)
-                # 生成方向信息
                 direction_info = ";direction vectors:front=%s,left=%s,right=%s,behind=%s\n" % (front_vector, left_vector, right_vector, behind_vector)
-                #
             else:
-                direction_info = "\n"  # 未知方向向量就啥都不写
+                direction_info = "\n"
 
-            # sr3d，给出center、size
+            # For sr3d, describe center and size.
             if self.dataset_type == 'sr3d':
+                # sr3d ablation study
                 if self.obj_info_ablation_type == 1:
                     # no size
                     line = f'{obj["label"]},id={obj["id"]},ctr={remove_spaces(str(center_position))}'
@@ -567,25 +574,27 @@ class Transcrib3D:
                     # vanilla
                     line = f'{obj["label"]},id={obj["id"]},ctr={remove_spaces(str(center_position))},size={remove_spaces(str(size))}'
 
-            # nr3d和scanrefer，给出center、size、color
+            # For nr3d and scanrefer, describe center, size and color.
             else:
                 rgb = obj['median_rgba'][0:3] if (self.dataset_type == 'scanrefer' and not self.use_gt_box) else obj['avg_rgba'][0:3]
                 hsl = round_list(rgb_to_hsl(rgb), 2)
 
-                # line="%s,id=%s,ctr=%s,size=%s,RGB=%s" %(obj['label'], obj['id'], remove_spaces(str(center_position)), remove_spaces(str(size)), remove_spaces(str(rgb) )) #原版rgb
-                # line="%s,id=%s,ctr=%s,size=%s,HSL=%s" %(obj['label'], obj['id'], remove_spaces(str(center_position)), remove_spaces(str(size)), remove_spaces(str(hsl))) #rgb换成hsl
-                line = "%s(relevant to %s),id=%s,ctr=%s,size=%s,HSL=%s" % (obj['label'], id_to_name_in_description[obj['id']], obj['id'], remove_spaces(str(center_position)), remove_spaces(str(size)), remove_spaces(str(hsl)))  # 格式：name=原名称(description里的名称)
-                # if id_to_name_in_description[obj['id']]=='room':
-                #     name=obj['label']
-                # else:
-                #     name=id_to_name_in_description[obj['id']]
-                # line="%s,id=%s,ctr=%s,size=%s,HSL=%s" %(name, obj['id'], remove_spaces(str(center_position)), remove_spaces(str(size)), remove_spaces(str(hsl) )) # 格式：name=description里的名称
+                # line="%s,id=%s,ctr=%s,size=%s,RGB=%s" %(obj['label'], obj['id'], remove_spaces(str(center_position)), remove_spaces(str(size)), remove_spaces(str(rgb) )) #rgb
+                # line="%s,id=%s,ctr=%s,size=%s,HSL=%s" %(obj['label'], obj['id'], remove_spaces(str(center_position)), remove_spaces(str(size)), remove_spaces(str(hsl))) #hsl
+                line = "%s(relevant to %s),id=%s,ctr=%s,size=%s,HSL=%s" % (obj['label'], id_to_name_in_description[obj['id']], obj['id'], remove_spaces(str(center_position)), remove_spaces(str(size)), remove_spaces(str(hsl)))
+            
+            # Append direction info to line and append it to lines
             lines.append(line + direction_info)
+        
+        # ablation study 4: shuffle the lines
         if self.obj_info_ablation_type == 4:
             random.seed(0)
             random.shuffle(lines)
+            
+        # append lines to prompt
         prompt += ''.join(lines)
-        # prompt中的要求
+        
+        # the instruction part of the prompt
         line = "Instruction:find the one described object in description: \n\"%s\"\n" % utterance
         prompt = prompt + line
         # if self.dataset_type=='sr3d':
@@ -595,18 +604,10 @@ class Transcrib3D:
         # if not self.dataset_type=='sr3d':
         #     # prompt=prompt+" Howerver, if the direction vector of A is not provided, you should use other information to identify the referred object instead of assuming a direction vector."
 
+        # some additional prompt engineering
         prompt = prompt + "\nThere is exactly one answer, so if you receive multiple answers, consider other constraints; if get no answers, loosen constraints."
         prompt = prompt + "\nWork this out step by step to ensure right answer."
-        # prompt=prompt+"\nYou should calculate the result in each step and tell me the exact final result."
-        # prompt=prompt+"But Do Not response anything except the id."
-        # prompt=prompt+"\nIn the last line of your response, there should Only be a python dictionary in format: {'ID':id}, where id is the id of the referred object."
-
-        # prompt=prompt+"\nIf the answewr is complete, add 'Now the answer is complete.' to the end of your answer."
-        # prompt=prompt+"\n Then in the last line of your response, there should Only be a python dictionary in format: {'ID':id}, where id is the id of the referred object."
-
         prompt = prompt + "\nIf the answer is complete, add \"Now the answer is complete -- {'ID':id}\" to the end of your answer(that is, your completion, not your code), where id is the id of the referred obj. Do not add anything after."
-
-        # prompt=prompt+"\n Do not stop before you find the right id."
 
         if to_print:
             print("--------------------------------------------")
@@ -614,13 +615,15 @@ class Transcrib3D:
             print("--------------------------------------------")
             print("Right answer:", target_id)
             print("")
+            
+        # some inforation to be returned
         if self.dataset_type == 'sr3d':
             relevant_ids = None
             info = (scan_id, target_id, target_class, distractor_ids, reference_type, utterance, anchor_has_front)
         elif self.dataset_type == 'nr3d':
             info = (scan_id, target_id, target_class, utterance, mentions_target_class, uses_object_lang, uses_spatial_lang, uses_color_lang, uses_shape_lang, object_filter, target_dialogue_path)
         else:
-            gt_box = self.get_scanrefer_gt_box(scan_id, target_id)
+            gt_box = get_scanrefer_gt_box(scan_id, target_id)
             info = (scan_id, target_id, target_class, utterance, annotation_id, objects_related, gt_box, object_filter, target_dialogue_path, is_unique)
 
         return prompt, info, relevant_ids
