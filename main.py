@@ -32,10 +32,37 @@ logger.addHandler(console_handler)
 
 
 class Transcrib3D:
-    def __init__(self, scannet_data_root, script_root, dataset, refer_dataset_path, result_folder_name, gpt_config, scanrefer_iou_thr=0.5, use_gt_box=True, object_filter_result_check_folder_name=None, object_filter_result_check_list=None, use_principle=True, use_original_viewdep_judge=True, use_object_filter=True, scanrefer_tool_name='mask3d', use_priority=False, use_code_interpreter=True, obj_info_ablation_type=0, use_camera_position=True, filter_behind_obj=True) -> None:
+    def __init__(self, workspace_path, scannet_data_root, dataset_type, refer_dataset_path, result_folder_name, gpt_config, scanrefer_iou_thr=0.5, use_gt_box=True, object_filter_result_check_folder_name=None, object_filter_result_check_list=None, use_principle=True, use_original_viewdep_judge=True, use_object_filter=True, scanrefer_tool_name='mask3d', use_priority=False, use_code_interpreter=True, use_camera_position=True, filter_behind_obj=True, obj_info_ablation_type=0) -> None:
+        """
+        Class initialization.
+
+        Parameters:
+            workspace_path (str): Path of Transcrib3D project folder.
+            scannet_data_root (str): Path to the ScanNet data folder.
+            dataset_type (str): Type of refering dataset. One of [sr3d, nr3d, scanrefer].
+            refer_dataset_path (str): Path to the refering dataset file (.csv or .json).
+            result_folder_name (str): The name of result folder of a certain experiment setting. It will be under the 'results' folder.
+            gpt_config (dict): GPT config dictionary.
+            scanrefer_iou_thr (float): The IoU threshold for a ScanRefer case to be judge to correct.
+            use_gt_box (bool): To use ground truth bounding boxes of objects in the scene or not.
+            object_filter_result_check_folder_name (str): 
+            object_filter_result_check_list (list):
+            use_principle (bool): To declare some useful logic principles in prompt or not.
+            use_original_viewdep_judge (bool): 
+            use_object_filter (bool): To use object filter to filter out irrelevant objects or not.
+            use_priority (bool): To declare human-designed priorities of constraints (e.g. position, color) or not.
+            use_code_interpreter (bool): To use code interpreter during interactive reasoning or not.
+            use_camera_position (bool): For scanrefer, to use camera position and pose or not.
+            filter_behind_obj (bool): For scanrefer, to filter out objects behind the camera or not.
+            obj_info_ablation_type (int): Ablation type of object information.
+
+        Returns:
+            None.
+
+        """
+        self.workspace_path = workspace_path
         self.scannet_data_root = scannet_data_root
-        self.script_root = script_root
-        self.dataset_type = dataset
+        self.dataset_type = dataset_type
         self.refer_dataset_path = refer_dataset_path
         self.result_folder_name = result_folder_name
         self.gpt_config = gpt_config
@@ -63,28 +90,47 @@ class Transcrib3D:
 
 
     def filter_out_obj_behind_camera(self, obj_list, camera_info):
+        """
+        Filter out objects in the half space behind the camera.
+
+        Parameters:
+            obj_list (list): List of objects.
+            camera_info (dict): A dictionary recording camera position and viewpoint.
+
+        Returns:
+            list: List of objects.
+        """
         camera_position = camera_info['position']
         camera_lookat = camera_info['lookat']
         lookat_vec = camera_lookat - camera_position
         obj_list_f = []
         for obj in obj_list:
             obj_vec = obj['center_position'] - camera_position
-            if np.dot(lookat_vec, obj_vec) >= 0:
+            if np.dot(lookat_vec, obj_vec) >= 0: # the dot product should >= 0
                 obj_list_f.append(obj)
         print("Before filter_out_obj_behind_camera: %d objects." % len(obj_list))
         print("After filter_out_obj_behind_camera: %d objects." % len(obj_list_f))
         return obj_list_f
 
-    def non_max_suppression(self, objects_info_f, iou_threshold=0.5):
+    def non_max_suppression(self, objects_info_f:list, iou_threshold=0.5):
+        """
+        Filter out overlapped bounding boxes representing the same object. Box with highest confidential score
+        will be kept.
+
+        Parameters:
+            objects_info_f (list): List of objects(bounding boxes).
+            iou_threshold (float): IoU threshold for overlap judgement.
+
+        Returns:
+            list: List of objects.
+        """
         print("before non_max_suppression: %d objects." % len(objects_info_f))
         # sort in order of conf score
         objects_info_f.sort(key=lambda x: x['score'], reverse=True)
 
         selected_objects = []
 
-        # iterate through the list
         while len(objects_info_f) > 0:
-            # take out the current object
             current_object = objects_info_f[0]
             selected_objects.append(current_object)
             objects_info_f.pop(0)
@@ -97,27 +143,35 @@ class Transcrib3D:
 
     @retry(wait=wait_exponential_jitter(initial=20, max=120, jitter=20), stop=stop_after_attempt(5), before_sleep=before_sleep_log(logger, logging.ERROR))  # 20s,40s,80s,120s + random.uniform(0,20)
     def get_gpt_response(self, prompt: str, code_interpreter: CodeInterpreter):
-        # get response from GPT(using code interpreter). using retry from tenacity.
-        # count the token usage and time as well
-        # if the reponse does not include "Now the answer is complete", this means the answer is not done. attach an empty user message to let GPT to keep going.
+        """
+        Get response from GPT(using code interpreter). Using retry from tenacity because the openai token limitation might be reached.
+        Measure the token usage and time as well.
+        If the reponse does not include "Now the answer is complete", this means the answer is not done. attach an empty user message to continue the conversation.
 
+        Parameters:
+            prompt (str): The generated prompt.
+            code_interpreter (CodeInterpreter): An instance of CodeInterpreter class.
+
+        Returns:
+            list: List of objects.
+        """
         # start timing
         call_start_time = time.time()
         # the first call with the original prompt
-        response, token_usage_total = code_interpreter.call_openai_with_code_interpreter(prompt)
-        response = response['content']
-        # loop until "Now the answer is complete" is in the response, or looping more than 10 times.
+        response, token_usage_total = code_interpreter.call_llm_with_code_interpreter(prompt)
+
+        # looping until "Now the answer is complete" is in the response, or looping more than 10 times.
         count_response = 0
         while not "Now the answer is complete" in response:
             if count_response >= 10:
                 print("Response does not end with 'Now the answer is complete.' !")
                 break
-            response, token_usage_add = code_interpreter.call_openai_with_code_interpreter('')
-            response = response['content']
+            response, token_usage_add = code_interpreter.call_llm_with_code_interpreter('')
             token_usage_total += token_usage_add
             count_response += 1
             print("count_response:", count_response)
-        # stop timing
+
+        # stop timing and do some statistics
         call_end_time = time.time()
         time_consumed = call_end_time - call_start_time
         self.token_usage_this_ques += token_usage_total
@@ -131,28 +185,36 @@ class Transcrib3D:
 
     @retry(wait=wait_exponential_jitter(initial=5, max=30, jitter=5), stop=stop_after_attempt(2), before_sleep=before_sleep_log(logger, logging.ERROR))  # 20s,40s,80s,120s + random.uniform(0,20)
     def get_gpt_response_no_code_interpreter(self, prompt: str, gpt_dialogue: Dialogue):
-        # get response from GPT(without code interpreter). using retry from tenacity.
-        # count the token usage and time as well
-        # if the reponse does not include "Now the answer is complete", this means the answer is not done. attach an empty user message to let GPT to keep going.
+        """
+        Get response from GPT(without code interpreter). Using retry from tenacity because the openai token limitation might be reached.
+        Measure the token usage and time as well.
+        If the reponse does not include "Now the answer is complete", this means the answer is not done. attach an empty user message to continue the conversation.
 
+        Parameters:
+            objects_info_f (list): List of objects(bounding boxes).
+            iou_threshold (float): IoU threshold for overlap judgement.
+
+        Returns:
+            list: List of objects.
+        """
         # start timing
         call_start_time = time.time()
-        # firt call
-        response, token_usage_total = gpt_dialogue.call_openai(prompt)
-        response = response['content']
-        # loop
+        # the first call with the original prompt
+        response, token_usage_total = gpt_dialogue.call_llm(prompt)
+        
+        # looping until "Now the answer is complete" is in the response, or looping more than 10 times.
         count_response = 0
         while not "Now the answer is complete" in response:
             if count_response >= 10:
                 print("Response does not end with 'Now the answer is complete.' !")
                 break
-            response, token_usage_add = gpt_dialogue.call_openai('')
-            response = response['content']
+            response, token_usage_add = gpt_dialogue.call_llm('')
             token_usage_total += token_usage_add
             # print('Bot:', response)
             count_response += 1
             print("count_response:", count_response)
-        # stop timing
+
+        # stop timing and do some statistics
         call_end_time = time.time()
         time_consumed = call_end_time - call_start_time
         self.token_usage_this_ques += token_usage_total
@@ -328,53 +390,57 @@ class Transcrib3D:
 
         return relevant_ids, relevant_dict, object_filter, target_dialogue_path
 
-    def gen_prompt_compressed(self, data_index, to_print=True, deal_with_human_wrong_case=False, deal_with_not_mention_target_class=False):
+    def generate_prompt(self, data_index, to_print=True, deal_with_human_wrong_case=False, deal_with_not_mention_target_class=False):
         """
         对于sr3d/nr3d/scanrefer中的指定数据，返回compressed prompt以及其他相关信息
         """
 
         # 读取指定行的数据，如果数据中的correct_guess为FALSE则返回-1
+        # read in data with the given data_index
         if self.dataset_type == 'sr3d':
             data = self.sr3d_data[data_index]
         elif self.dataset_type == 'nr3d':
             data = self.nr3d_data[data_index]
         else:
             data = self.scanrefer_data[data_index]
+
+        # directly return if certain conditions are met.
         if (self.dataset_type == 'sr3d' or self.dataset_type == 'nr3d') and (not deal_with_human_wrong_case) and (data['correct_guess'] in ['False', 'FALSE', 'false']):
             return -1, -1, -1
         if (self.dataset_type == 'sr3d' or self.dataset_type == 'nr3d') and (not deal_with_not_mention_target_class) and (data['mentions_target_class'] in ['False', 'FALSE', 'false']):
             return -2, -2, -2
-        # 读入scan_id
+        
+        # read in scan_id
         scan_id = data['scene_id'] if self.dataset_type == 'scanrefer' else data['scan_id']
         if to_print:
             print("scan_id:", scan_id)
 
-        # 读入refered class and object ids
+        # read in refered class and object ids
         target_class = data['object_name'] if self.dataset_type == 'scanrefer' else data["instance_type"]
         target_id = data['object_id'] if self.dataset_type == 'scanrefer' else data["target_id"]
 
-        # 读入utterance，根据情况补上句点
+        # read in utterance
         utterance = data['description'] if self.dataset_type == 'scanrefer' else data["utterance"]
         if not utterance.endswith("."):
             utterance += "."
 
-        # 读入sr3d的reference type, distractors_ids, achor_types和anchor_ids
+        # read in reference type, distractors_ids, achor_types and anchor_ids of sr3d
         if self.dataset_type == 'sr3d':
             reference_type = data["coarse_reference_type"]
             distractor_ids = eval(data["distractor_ids"])
             anchor_classes = data["anchors_types"]
             anchor_ids = eval(data["anchor_ids"])
 
-        # 读入nr3d 的一些信息
+        # read in some information of nr3d
         elif self.dataset_type == 'nr3d':
             mentions_target_class, uses_object_lang, uses_spatial_lang, uses_color_lang, uses_shape_lang = data["mentions_target_class"], data["uses_object_lang"], data["uses_spatial_lang"], data["uses_color_lang"], data["uses_shape_lang"]
 
-        # 读入scanrefer的一些信息
+        # read in some information of scanrefer, including the camera information
         else:
             annotation_id = data['ann_id']
-            camera_info_aligned = get_scanrefer_camera_info_aligned(os.path.join(self.script_root, "data"), scan_id, target_id, annotation_id)
+            camera_info_aligned = get_scanrefer_camera_info_aligned(os.path.join(self.workspace_path, "data"), scan_id, target_id, annotation_id)
 
-        # 读入事先准备好的物体信息，即npy文件
+        # read in the prepared object information (.npy file)
         npy_path_train = os.path.join(self.scannet_data_root, "objects_info_%s" % self.scanrefer_tool_name, "objects_info_%s_%s.npy" % (self.scanrefer_tool_name, scan_id)) if (self.dataset_type == 'scanrefer' and not self.use_gt_box) else os.path.join(self.scannet_data_root, "objects_info", "objects_info_%s.npy" % scan_id)
         # npy_path_test=self.scannet_data_root+"/test/objects_info_%s/objects_info_%s_"%(self.scanrefer_tool_name,self.scanrefer_tool_name) +scan_id + ".npy" if (self.dataset_type=='scanrefer' and not self.use_gt_box) else self.scannet_data_root+"/test/objects_info/objects_info_"+scan_id+".npy"
         # if os.path.exists(npy_path_train):
@@ -620,12 +686,12 @@ class Transcrib3D:
         print("formatted_time:", formatted_time)
 
         # create a result folder for the chosen test mode if it does not exist.
-        result_folder = os.path.join(self.script_root, self.result_folder_name)
+        result_folder = os.path.join(self.workspace_path, 'results', self.result_folder_name)
         if not os.path.exists(result_folder):
             os.makedirs(result_folder)
 
         # the subfolder of the current experiment. named after the time.
-        # results_sub_folder = self.script_root + self.result_folder_name + formatted_time + '/'
+        # results_sub_folder = self.workspace_path + self.result_folder_name + formatted_time + '/'
         results_sub_folder = os.path.join(result_folder, formatted_time)
         if not os.path.exists(results_sub_folder):
             os.makedirs(results_sub_folder)
@@ -679,7 +745,7 @@ class Transcrib3D:
             self.token_usage_this_ques = 0
 
             # generate prompt
-            prompt, info, relevant_ids = self.gen_prompt_compressed(line_number, to_print=True)
+            prompt, info, relevant_ids = self.generate_prompt(line_number, to_print=True)
             if prompt is None:
                 with open(process_log_file, 'a') as f:
                     f.write("prompt not generated. Perhaps the object_info npy file does not exist.")
@@ -959,9 +1025,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Transcrib3D")
 
     parser.add_argument("--scannet_data_root", type=str, help="Path of folder that contains scannet scene folders such as 'scene0000_00'.")
-    parser.add_argument("--script_root", type=str, help="Path of the Transcribe3D project folder.")
+    parser.add_argument("--workspace_path", type=str, help="Path of the Transcribe3D project folder.")
     parser.add_argument("--mode", type=str, choices=["eval", "result", "self_correct", "check_scanrefer"], help="Mode of operation     (eval or result)")
-    parser.add_argument("--dataset", type=str, choices=["nr3d", "sr3d", "scanrefer"], help="Choose the refering dataset.")
+    parser.add_argument("--dataset_type", type=str, choices=["nr3d", "sr3d", "scanrefer"], help="Choose the refering dataset.")
     parser.add_argument("--conf_idx", type=int, help="Configuration index in file config.py.")
     parser.add_argument("--range", type=int, nargs='*', help="Range of line numbers of the refering dataset(will be fed to np.arange()). For nr3d and sr3d, the minimum is 2. For scanrefer, the minimum is 0.")
     parser.add_argument("--line_numbers", type=int, nargs='*', help="When the 'range' parameter is not provided, you can specify non-contiguous line numbers here.")
@@ -978,21 +1044,21 @@ def parse_args():
 def main():
     args = parse_args()
 
-    if args.dataset == 'nr3d':
+    if args.dataset_type == 'nr3d':
         eval_config = confs_nr3d[args.conf_idx]
-    elif args.dataset == 'sr3d':
+    elif args.dataset_type == 'sr3d':
         eval_config = confs_sr3d[args.conf_idx]
-    elif args.dataset == 'scanrefer':
+    elif args.dataset_type == 'scanrefer':
         eval_config = confs_scanrefer[args.conf_idx]
     else:
-        print("invalid dataset!")
+        print("invalid dataset_type!")
 
     print("test config:\n", eval_config)
     print("\n")
 
     system_message = 'Imagine you are an artificial intelligence assistant. You job is to do 3D referring reasoning, namely to find the object for a given utterance from a 3d scene presented as object-centric semantic information.\n'
     system_message += get_system_message() if eval_config['use_code_interpreter'] else ''
-    if args.dataset == 'sr3d':
+    if args.dataset_type == 'sr3d':
         system_message += get_principle_sr3d() if eval_config['use_principle'] else ''
     else:
         system_message += get_principle(eval_config['use_priority']) if eval_config['use_principle'] else ''
@@ -1018,8 +1084,8 @@ def main():
         eval_config['use_object_filter'] = True
 
     transcrib3d = Transcrib3D(scannet_data_root=args.scannet_data_root,
-                      script_root=args.script_root,
-                      dataset=eval_config['dataset'],
+                      workspace_path=args.workspace_path,
+                      dataset_type=eval_config['dataset_type'],
                       refer_dataset_path=eval_config['refer_dataset_path'],
                       result_folder_name=result_folder_name,
                       gpt_config=openai_config,
@@ -1048,13 +1114,13 @@ def main():
         if isinstance(formatted_time, list):
             print('is list')
             # result_path = ["%s%s/%s.npy" % (result_folder_name, ft, ft) for ft in formatted_time]
-            result_path = [os.path.join(result_folder_name, ft, f"{ft}.npy") for ft in formatted_time]
+            result_path = [os.path.join('results', result_folder_name, ft, f"{ft}.npy") for ft in formatted_time]
         else:
             # result_path = "%s%s/%s.npy" % (result_folder_name, formatted_time, formatted_time) if formatted_time is not None else None
-            result_path = os.path.join(result_folder_name, formatted_time, f"{formatted_time}.npy") if formatted_time is not None else None
+            result_path = os.path.join('results', result_folder_name, formatted_time, f"{formatted_time}.npy") if formatted_time is not None else None
         if result_path:
             # refer3d.analyse_result(result_path)
-            config = (os.path.join(transcrib3d.script_root, "data"), transcrib3d.use_original_viewdep_judge, transcrib3d.use_gt_box, transcrib3d.scanrefer_iou_thr)
+            config = (os.path.join(transcrib3d.workspace_path, "data"), transcrib3d.use_original_viewdep_judge, transcrib3d.use_gt_box, transcrib3d.scanrefer_iou_thr)
             analyse_result(transcrib3d.dataset_type, transcrib3d.refer_dataset_path, result_path, config)
 
     elif args.mode == 'self_correct':
@@ -1063,7 +1129,7 @@ def main():
         formatted_time = args.ft
         print(formatted_time)
         for time in formatted_time:
-            transcrib3d.self_correction_dataset(result_folder_path=args.script_root + eval_config['result_folder_name'], formatted_time=time, line_number_list=np.arange(0, 400) if args.dataset == 'scanrefer' else np.arange(2, 400))
+            transcrib3d.self_correction_dataset(result_folder_path=args.workspace_path + eval_config['result_folder_name'], formatted_time=time, line_number_list=np.arange(0, 400) if args.dataset_type == 'scanrefer' else np.arange(2, 400))
 
     elif args.mode == "check_scanrefer":
         """check the how many cases are provided with detected boxes that has 0.5(0.25) or higher iou with gt box"""

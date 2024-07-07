@@ -1,6 +1,7 @@
 import os
 import json
 import datetime
+from copy import deepcopy
 import openai
 openai.api_key = os.getenv("OPENAI_API_KEY")
 from openai import OpenAI
@@ -75,9 +76,8 @@ class Dialogue:
         with open(json_path, 'w') as f:
             f.write(json_object)
     
-    def print_pretext(self,print_system_and_user_first_prompt=True,to_print_out=True):
+    def print_pretext(self, print_system_and_user_first_prompt=True, to_print_out=True):
         # determine whether to print system message and user's first prompt
-        from copy import deepcopy
         pretext=deepcopy(self.pretext)
         if not print_system_and_user_first_prompt:
             pretext=pretext[2:]
@@ -85,31 +85,34 @@ class Dialogue:
         # print pretext
         for piece in pretext:
             if to_print_out:
-                print('----------------->ROLE: '+piece['role']+'\t<-----------------')
+                print('----------------->\tROLE: '+piece['role']+'\t<-----------------')
                 print('CONTENT: '+piece['content'])
             printed_pretext=printed_pretext+'----------------->\tROLE: '+piece['role']+'\t<-----------------\n'
             printed_pretext=printed_pretext+'CONTENT: '+piece['content']+'\n'
         self.printed_pretext=printed_pretext
 
-    def call_openai(self, user_prompt):
+    def call_llm(self, user_prompt):
+        """
+        Call LLM with user prompt, get the response, append the user prompt and the response to pretext(dialogue history), and return the current response and token usage.
+
+        Parameters:
+            user_prompt (str): The user prompt.
+
+        Returns:
+            str: The response content.
+            int: The token usage in this round of conversation.
+        """
         user_message = [{"role": "user", "content": user_prompt}]
         messages = self.pretext + user_message
         # print('messages: ', messages)
         if 'gpt' in self.model:
             completion = client.chat.completions.create(
                 model=self.model,
-                messages=self.pretext + user_message,
+                messages=messages,
                 temperature=self.temperature,
                 top_p=self.top_p,
                 seed=42,
             )
-            # completion = openai.ChatCompletion.create(
-            #     model=self.model,
-            #     messages=self.pretext + user_message,
-            #     temperature=self.temperature,
-            #     top_p=self.top_p,
-            # )
-            # print('completion: ', completion)
             raw_response_message = completion.choices[0].message
             assistant_response_message = {'role': raw_response_message.role, 'content': raw_response_message.content}
             # print('assistant_response_message: ', assistant_response_message)
@@ -122,7 +125,7 @@ class Dialogue:
         
         self.pretext = self.pretext + user_message + [assistant_response_message]
         
-        return assistant_response_message, token_usage
+        return assistant_response_message['content'], token_usage
 
 
 if __name__ == '__main__':
@@ -177,6 +180,7 @@ if __name__ == '__main__':
                 config['save_path'], 'dialogue_' + timestamp + '.json'))
             continue
         else:
-            assistant_response_message, token_usage = dialogue.call_openai(user_prompt)
-            response = assistant_response_message['content']
-            print('Bot:', response)
+            assistant_response_message, token_usage = dialogue.call_llm(user_prompt)
+            # response = assistant_response_message['content']
+            # print('Bot:', response)
+            print('Bot:', assistant_response_message)

@@ -7,7 +7,7 @@ import os
 from sklearn.cluster import DBSCAN
 from scipy import sparse
 from collections import Counter
-from scannet200_constants import VALID_CLASS_IDS_20,CLASS_LABELS_20,VALID_CLASS_IDS_200,CLASS_LABELS_200
+from data.scannet200_constants import VALID_CLASS_IDS_20,CLASS_LABELS_20,VALID_CLASS_IDS_200,CLASS_LABELS_200
 
 
 def read_dict(file_path):

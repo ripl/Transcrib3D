@@ -2,8 +2,9 @@ import numpy as np
 import os,json
 import re
 import logging
-from gpt_dialogue import Dialogue
 import openai
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
 from tenacity import (
     retry,
     before_sleep_log,
@@ -14,7 +15,8 @@ from tenacity import (
     RetryError
 )  # for exponential backoff
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+from core.gpt_dialogue import Dialogue
+
 
 logger = logging.getLogger(__name__+'logger')
 logger.setLevel(logging.ERROR)
@@ -23,6 +25,8 @@ console_handler.setLevel(logging.ERROR)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
+
+dir_path = os.path.dirname(os.path.abspath(__file__))
 
 class ObjectFilter(Dialogue):
     def __init__(self, model='gpt-4'):
@@ -34,7 +38,7 @@ class ObjectFilter(Dialogue):
         'top_p': 0.0,
         'max_tokens': 8192,
         # 'load_path': './object_filter_pretext.json',
-        'load_path': './object_filter_pretext_new.json',
+        'load_path': os.path.join(dir_path, 'object_filter_pretext_new.json'),
         'debug': False
         }
         super().__init__(**config)
@@ -109,8 +113,8 @@ class ObjectFilter(Dialogue):
         
         
         # get response from gpt
-        response,token_usage=self.call_openai(prompt)
-        response=response['content']
+        response,token_usage=self.call_llm(prompt)
+        # response=response['content']
         # print("response:",response)
         last_line = response.splitlines()[-1] if len(response) > 0 else ''
 

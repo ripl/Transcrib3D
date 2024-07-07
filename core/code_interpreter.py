@@ -3,41 +3,51 @@ from io import StringIO
 from contextlib import redirect_stdout
 import traceback
 import openai
-from gpt_dialogue import Dialogue
 openai.api_key = os.getenv("OPENAI_API_KEY")
+
+from core.gpt_dialogue import Dialogue
 
 class CodeInterpreter(Dialogue):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def call_openai_with_code_interpreter(self, user_prompt,namespace_for_exec={},token_usage_total=0):
-        # 如果gpt回复的内容包含python代码，则把代码的执行结果发送给gpt，继续等待其回复
-        # 如果gpt回复的内容不包含python代码，则此函数返回全部结果
-        # 每次递归统计使用的token数，最终返回总的token数
-        assistant_response,token_usage = self.call_openai(user_prompt)
-        token_usage_total+=token_usage
+    def call_llm_with_code_interpreter(self, user_prompt, namespace_for_exec={}, token_usage_total=0):
+        """
+        Call LLM with user prompt, using the code interpreter mechanism. 
+        If the LLM response contains python code snippets, they will be executed locally, and the conversation will continue with the execution result appended.
+        If an error occurs during code execution, the error message will be appended instead.
+        If the LLM response does not contain code, the function will return. Note that only the last response content will be returned, and the entire dialogue is stored in self.pretext variable.
 
-        # check if response contain code snippet
-        response_content = assistant_response['content']
+        Parameters:
+            user_prompt (str): The user prompt.
+            namespace_for_exec (dict): Namespace used in the exec() function. This enables LLM to use variables or functions it defined in previous rounds of conversation.
+            token_usage_total (int): Token usage in total in current non-recursive call of this function.
+
+        Returns:
+            str: The response content.
+            int: The token usage in this round of conversation.
+        """
+        assistant_response, token_usage = self.call_llm(user_prompt)
+        token_usage_total += token_usage
+
         if self.debug:
-            print('response_content: ', response_content)
-        response_splits = response_content.split('```python')
+            print('response_content: ', assistant_response)
+
+        # check if the response contains code snippet
+        response_splits = assistant_response.split('```python')
         if len(response_splits) <= 1:
-            # no code snippet found, return the raw response
+            # if the LLM response contains no code, the function will return.
             if self.debug:
                 print('no code snippet found, return the raw response')
             return assistant_response,token_usage_total
         else:
-            # code snippet found, execute the code
-            # code_snippet = response_splits[-1].split('```')[0]
-            # print('code snippet: ', code_snippet)
+            # if code snippet is found, then execute the code
             code_snippet=""
             for split in response_splits:
                 if '```' in split:
                     code_snippet+=split.split('```')[0]
             f = StringIO()
-            # sys.stdout = f
             code_exec_success=True
             
             with redirect_stdout(f):
@@ -48,29 +58,13 @@ class CodeInterpreter(Dialogue):
                     code_exec_success=False
                     traceback_message_lines=traceback.format_exc().splitlines()
                     code_exe_result = '\n'.join(traceback_message_lines[-4:])
-            # code_exe_result = f.getvalue()
-            # f.close()
-            # sys.stdout = sys.__stdout__
-            
-            #############利用保存文件的方式####################
-            # # 将代码片段保存到 code_snippet.py 文件
-            # with open("code_snippet.py", "w") as file:
-            #     file.write(code_snippet)
 
-            # # 执行 code_snippet.py 并将输出重定向到临时文件
-            # os.system("python code_snippet.py > output.txt")
-
-            # # 从临时文件中读取结果
-            # with open("output.txt", "r") as file:
-            #     code_exe_result = file.read()
-            ##################################################
             if code_exec_success:
                 code_exe_msg='code execution result:\n' + str(code_exe_result)
             else:
                 code_exe_msg = "An error was raised when executing the code you write: %s"%code_exe_result
-            # code_exe_msg = 'Execution result of the above code is: ' + str(code_exe_result)
             print(code_exe_msg)
-            return self.call_openai_with_code_interpreter(code_exe_msg,namespace_for_exec,token_usage_total)
+            return self.call_llm_with_code_interpreter(code_exe_msg, namespace_for_exec, token_usage_total)
         
 if __name__ == '__main__':
 
@@ -123,10 +117,10 @@ if __name__ == '__main__':
             continue
         else:
             # response = dialogue.call_openai(user_prompt)['content']
-            response = dialogue.call_openai_with_code_interpreter(user_prompt)['content']
+            response = dialogue.call_llm_with_code_interpreter(user_prompt)['content']
             print('Bot:', response)
             counter = 0
             while not response.endswith('Now the answer is complete.') and counter < 10:
-                response = dialogue.call_openai_with_code_interpreter('')['content']
+                response = dialogue.call_llm_with_code_interpreter('')['content']
                 print('Bot:', response)
                 counter += 1
