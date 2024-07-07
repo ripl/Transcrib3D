@@ -7,17 +7,19 @@ import os
 import random
 import re
 import time
+import numpy as np
 from copy import deepcopy
 from datetime import datetime
-
-import numpy as np
 from tenacity import RetryError, before_sleep_log, retry, stop_after_attempt, wait_exponential_jitter  # for exponential backoff
 
-from code_interpreter import CodeInterpreter
-from config import confs_nr3d, confs_scanrefer, confs_sr3d
-from gpt_dialogue import Dialogue
-from object_filter_gpt4 import ObjectFilter
-from prompt_text import get_principle, get_principle_sr3d, get_system_message
+from core.code_interpreter import CodeInterpreter
+from core.gpt_dialogue import Dialogue
+from core.object_filter_gpt4 import ObjectFilter
+from core.prompt_text import get_principle, get_principle_sr3d, get_system_message
+from config.config import confs_nr3d, confs_scanrefer, confs_sr3d
+from utils.utils import *
+from utils.read_data import *
+from utils.analyse_result import *
 
 # logging.basicConfig(stream=sys.stderr, level=logging.ERROR)
 logger = logging.getLogger(__name__ + 'logger')
@@ -29,11 +31,11 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 
-class Refer3d:
+class Transcrib3D:
     def __init__(self, scannet_data_root, script_root, dataset, refer_dataset_path, result_folder_name, gpt_config, scanrefer_iou_thr=0.5, use_gt_box=True, object_filter_result_check_folder_name=None, object_filter_result_check_list=None, use_principle=True, use_original_viewdep_judge=True, use_object_filter=True, scanrefer_tool_name='mask3d', use_priority=False, use_code_interpreter=True, obj_info_ablation_type=0, use_camera_position=True, filter_behind_obj=True) -> None:
         self.scannet_data_root = scannet_data_root
         self.script_root = script_root
-        self.dataset = dataset
+        self.dataset_type = dataset
         self.refer_dataset_path = refer_dataset_path
         self.result_folder_name = result_folder_name
         self.gpt_config = gpt_config
@@ -54,101 +56,11 @@ class Refer3d:
         self.token_usage_this_ques = 0
         self.time_consumed_whole_run = 0
         self.time_consumed_this_ques = 0
+        
+        self.sr3d_data, self.nr3d_data, self.scanrefer_data = None, None, None
 
-        self.raw_label_2_nyu40_idx = self.get_raw_label_2_nyu40_idx()
+        # self.raw_label_2_nyu40_idx = self.get_raw_label_2_nyu40_idx()
 
-    def load_refer_dataset(self, line_numbers=[2,]):
-        # load the refering dataset from the corresponding file,
-        # the dataset is one of (sr3d, nr3d, scanrefer).
-        # and check if the line numbers is in available range.
-        if self.dataset == 'sr3d':
-            self.sr3d_data = self.read_csv_with_index(self.refer_dataset_path)
-            assert np.max(line_numbers) <= len(self.sr3d_data) + 1, "line number %d > %d!" % (np.max(line_numbers), len(self.sr3d_data) + 1)
-            assert np.min(line_numbers) >= 2, "sr3d line number %s < 2!" % np.min(line_numbers)
-            return self.sr3d_data
-        elif self.dataset == 'nr3d':
-            self.nr3d_data = self.read_csv_with_index(self.refer_dataset_path)
-            assert np.max(line_numbers) <= len(self.nr3d_data) + 1, "line number %d > %d!" % (np.max(line_numbers), len(self.nr3d_data) + 1)
-            assert np.min(line_numbers) >= 2, "nr3d line number %s < 2!" % np.min(line_numbers)
-            return self.nr3d_data
-        elif self.dataset == 'scanrefer':
-            self.scanrefer_data = self.read_json(self.refer_dataset_path)
-            assert np.max(line_numbers) <= len(self.scanrefer_data) - 1, "line number %d > %d!" % (np.max(line_numbers), len(self.scanrefer_data) - 1)
-            assert np.min(line_numbers) >= 0, "scanrefer description number %s < 0!" % np.min(line_numbers)
-            return self.scanrefer_data
-        else:
-            print("Invalid dataset!")
-            return None
-
-    def get_scene_center(self, objects):
-        xmin, ymin, zmin = float('inf'), float('inf'), float('inf')
-        xmax, ymax, zmax = float('-inf'), float('-inf'), float('-inf')
-        for obj in objects:
-            x, y, z = obj['center_position']
-            if x < xmin:
-                xmin = x
-            if x > xmax:
-                xmax = x
-            if y < ymin:
-                ymin = y
-            if y > ymax:
-                ymax = y
-            if z < zmin:
-                zmin = z
-            if z > zmax:
-                zmax = z
-        return self.round_list([(xmin + xmax) / 2, (ymin + ymax) / 2, (zmin + zmax) / 2], 2)
-
-    def get_scanrefer_camera_info_aligned(self, scan_id, object_id, annotation_id):
-        """Return camera info which is axis aligned"""
-        json_path = os.path.join(self.script_root, 'data/scanrefer_camera_info', '%s.anns.json' % scan_id)
-        with open(json_path) as f:
-            data = json.load(f)
-        target_annotation = [d for d in data if d['object_id'] == object_id and d['ann_id'] == annotation_id]
-        if target_annotation:
-            if len(target_annotation) > 1:
-                print("%d camera info found! Returning the first one. scan_id=%s, object_id=%s, annotation_id=%s." % (len(target_annotation), scan_id, object_id, annotation_id))
-            camera_info = target_annotation[0]['camera']
-            position = camera_info['position']
-            lookat = camera_info['lookat']
-            # align the vectors(coordinates)
-            axis_align_matrix = self.get_axis_align_matrix(os.path.join(self.script_root, "data/scannet_scene_info", scan_id + ".txt"))
-            position_aligned = np.dot(axis_align_matrix, np.append(position, 1).reshape(4, 1))[0:3].reshape(-1)
-            lookat_aligned = np.dot(axis_align_matrix, np.append(lookat, 1).reshape(4, 1))[0:3].reshape(-1)
-            camera_info_aligned = {'position': position_aligned, 'lookat': lookat_aligned}
-            return camera_info_aligned
-
-        else:
-            print("No camera info found! scan_id=%s, object_id=%s, annotation_id=%s." % (scan_id, object_id, annotation_id))
-            return None
-
-    def round_list(self, lst, length):
-        # round every element in lst
-        for idx, num in enumerate(lst):
-            lst[idx] = round(num, length)
-        return list(lst)
-
-    def get_scanrefer_gt_box(self, scan_id, object_id):
-        # get the ground truth bounding box according to scan_id and object id
-        # from file scan_id_aligned_bbox.npy, which could be produced in pre-process of ScanRefer repo.
-        # scan_id_aligned_bbox.npy has matrices of shape (N, 8)，with each row as a box. box format is (cx,cy,cz,sx,sy,sz,label_id,obj_id).
-        gt_box_path = "/share/data/ripl/vincenttann/ScanRefer/data/scannet/scannet_data/" + scan_id + "_aligned_bbox.npy"
-        gt_boxes = np.load(gt_box_path)
-        gt_box = gt_boxes[gt_boxes[:, -1].reshape(-1).astype(int) == int(object_id)]
-        assert len(gt_box) > 0, "No gt box found!!! scan_id=%d, object_id=%d" % (scan_id, object_id)
-        assert len(gt_box) == 1, "Multiple gt box found!!! scan_id=%d, object_id=%d, gt_box found:%s" % (scan_id, object_id, str(gt_box))
-
-        return self.center_size_to_extension(gt_box.reshape(-1)[0:6])
-
-    def get_axis_align_matrix(self, txt_path):
-        with open(txt_path, 'r') as file:
-            lines = file.readlines()
-            for line in lines:
-                if "axisAlignment" in line:
-                    numbers = line.split('=')[1].strip().split()
-                    break
-        axis_align_matrix = np.array(numbers, dtype=float).reshape(4, 4)
-        return axis_align_matrix
 
     def filter_out_obj_behind_camera(self, obj_list, camera_info):
         camera_position = camera_info['position']
@@ -162,47 +74,6 @@ class Refer3d:
         print("Before filter_out_obj_behind_camera: %d objects." % len(obj_list))
         print("After filter_out_obj_behind_camera: %d objects." % len(obj_list_f))
         return obj_list_f
-
-    def center_size_to_extension(self, box_center_size):
-        cx, cy, cz, sx, sy, sz = box_center_size
-        xmin = cx - sx / 2
-        xmax = cx + sx / 2
-        ymin = cy - sy / 2
-        ymax = cy + sy / 2
-        zmin = cz - sz / 2
-        zmax = cz + sz / 2
-        return [xmin, ymin, zmin, xmax, ymax, zmax]
-
-    def extension_to_center_size(self, extension):
-        xmin, ymin, zmin, xmax, ymax, zmax = extension
-        cx = (xmin + xmax) / 2
-        cy = (ymin + ymax) / 2
-        cz = (zmin + zmax) / 2
-        sx = xmax - xmin
-        sy = ymax - ymin
-        sz = zmax - zmin
-        return [cx, cy, cz, sx, sy, sz]
-
-    def calc_iou(self, box1, box2):
-        # format of boxes: (xmin,ymin,zmin,xmax,ymax,zmax)
-        x1_min, y1_min, z1_min, x1_max, y1_max, z1_max = box1
-        x2_min, y2_min, z2_min, x2_max, y2_max, z2_max = box2
-
-        # itersection volume
-        x_overlap = max(0, min(x1_max, x2_max) - max(x1_min, x2_min))
-        y_overlap = max(0, min(y1_max, y2_max) - max(y1_min, y2_min))
-        z_overlap = max(0, min(z1_max, z2_max) - max(z1_min, z2_min))
-        intersection_volume = x_overlap * y_overlap * z_overlap
-
-        # volume of two boxes
-        volume_box1 = (x1_max - x1_min) * (y1_max - y1_min) * (z1_max - z1_min)
-        volume_box2 = (x2_max - x2_min) * (y2_max - y2_min) * (z2_max - z2_min)
-
-        # calculate IoU
-        union_volume = volume_box1 + volume_box2 - intersection_volume
-        iou = intersection_volume / union_volume if union_volume > 0 else 0.0
-
-        return iou
 
     def non_max_suppression(self, objects_info_f, iou_threshold=0.5):
         print("before non_max_suppression: %d objects." % len(objects_info_f))
@@ -219,90 +90,10 @@ class Refer3d:
             objects_info_f.pop(0)
 
             # calculate iou with all other objects in list, delete those has higher iou than threshold.
-            objects_info_f = [obj for obj in objects_info_f if self.calc_iou(current_object['extension'], obj['extension']) < iou_threshold]
+            objects_info_f = [obj for obj in objects_info_f if calc_iou(current_object['extension'], obj['extension']) < iou_threshold]
 
         print("after non_max_suppression: %d objects." % len(selected_objects))
         return selected_objects
-
-    def read_csv_with_index(self, file_path):
-        # read in the data of sr3d and nr3d(.csv)，return a dictionary.
-        # use the line number of the csv file as index, start from 2.
-        data = {}
-        with open(file_path, 'r', newline='', encoding='utf-8') as csvfile:
-            reader = csv.reader(csvfile)
-            headers = next(reader)  # the first line is the header
-            for index, row in enumerate(reader, start=2):  # interation start from line 2
-                data[index] = dict(zip(headers, row))
-        # print(len(data))
-        return data
-
-    def read_json(self, file_path):
-        # read in the data of scanrefer(.json)，returning a list of dictionary(same as that in the json file). index starts from 0.
-        with open(file_path, 'r') as jf:
-            jf_data = jf.read()  # jf_data is a string
-            data = json.loads(jf_data)
-        return data
-
-    def rgb_to_hsv(self, rgb):
-        # Convert RGB to [0, 1] range
-        r_prime, g_prime, b_prime = rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0
-
-        # Calculate chroma
-        chroma = max(r_prime, g_prime, b_prime) - min(r_prime, g_prime, b_prime)
-
-        # Calculate hue
-        hue = 0
-        if chroma == 0:
-            hue = 0
-        elif max(r_prime, g_prime, b_prime) == r_prime:
-            hue = (g_prime - b_prime) / chroma % 6
-        elif max(r_prime, g_prime, b_prime) == g_prime:
-            hue = (b_prime - r_prime) / chroma + 2
-        elif max(r_prime, g_prime, b_prime) == b_prime:
-            hue = (r_prime - g_prime) / chroma + 4
-        hue *= 60  # Convert to degrees
-
-        # Calculate value
-        value = max(r_prime, g_prime, b_prime)
-
-        # Calculate saturation
-        saturation = 0 if value == 0 else chroma / value
-
-        return [hue, saturation * 100, value * 100]  # Return HSV as percentages
-
-    def rgb_to_hsl(self, rgb):
-        # Normalize RGB values to the range [0, 1]
-        r, g, b = [x / 255.0 for x in rgb]
-
-        # Calculate min and max values of RGB to find chroma
-        c_max = max(r, g, b)
-        c_min = min(r, g, b)
-        chroma = c_max - c_min
-
-        # Calculate lightness
-        lightness = (c_max + c_min) / 2
-
-        # Calculate hue and saturation
-        hue = 0
-        saturation = 0
-
-        if chroma != 0:
-            if c_max == r:
-                hue = ((g - b) / chroma) % 6
-            elif c_max == g:
-                hue = ((b - r) / chroma) + 2
-            elif c_max == b:
-                hue = ((r - g) / chroma) + 4
-
-            hue *= 60
-
-            # Calculate saturation
-            if lightness <= 0.5:
-                saturation = chroma / (2 * lightness)
-            else:
-                saturation = chroma / (2 - 2 * lightness)
-
-        return [hue, saturation, lightness]
 
     @retry(wait=wait_exponential_jitter(initial=20, max=120, jitter=20), stop=stop_after_attempt(5), before_sleep=before_sleep_log(logger, logging.ERROR))  # 20s,40s,80s,120s + random.uniform(0,20)
     def get_gpt_response(self, prompt: str, code_interpreter: CodeInterpreter):
@@ -385,7 +176,8 @@ class Refer3d:
         utterance = data['description']
         annotation_id = data['ann_id']
         suffix = '_' + self.scanrefer_tool_name if self.scanrefer_tool_name else ''
-        npy_path_train = os.path.join(self.scannet_data_root, "objects_info%s/objects_info%s_" % (suffix, suffix) + scan_id + ".npy")
+        # npy_path_train = os.path.join(self.scannet_data_root, "objects_info%s/objects_info%s_" % (suffix, suffix) + scan_id + ".npy")
+        npy_path_train = os.path.join(self.scannet_data_root, "objects_info%s"%suffix, "objects_info%s_%s.npy" % (suffix, scan_id))
         # npy_path_test=self.scannet_data_root+"/test/objects_info%s/objects_info%s_"%(suffix,suffix) +scan_id + ".npy"
         # if os.path.exists(npy_path_train):
         #     npy_path=npy_path_train
@@ -402,7 +194,7 @@ class Refer3d:
         iou_max_object = None
         for obj in objects_info:
             box = obj['extension']
-            iou = self.calc_iou(gt_box, box)
+            iou = calc_iou(gt_box, box)
             if iou > iou_max:
                 iou_max = iou
                 iou_max_object = obj
@@ -415,7 +207,7 @@ class Refer3d:
 
     def check_scanrefer_answer_exist_percentage(self, iou_thr):
         # check all data records in scanrefer and calculate the percentage that answer might exist, given the detected boxes.
-        self.scanrefer_data = self.read_json(self.refer_dataset_path)
+        self.scanrefer_data = read_json(self.refer_dataset_path)
         answer_exist_count = 0
         answer_exist_count_unique = 0
         answer_exist_count_multiple = 0
@@ -536,58 +328,55 @@ class Refer3d:
 
         return relevant_ids, relevant_dict, object_filter, target_dialogue_path
 
-    def remove_spaces(self, s: str):
-        return s.replace(' ', '')
-
     def gen_prompt_compressed(self, data_index, to_print=True, deal_with_human_wrong_case=False, deal_with_not_mention_target_class=False):
         """
         对于sr3d/nr3d/scanrefer中的指定数据，返回compressed prompt以及其他相关信息
         """
 
         # 读取指定行的数据，如果数据中的correct_guess为FALSE则返回-1
-        if self.dataset == 'sr3d':
+        if self.dataset_type == 'sr3d':
             data = self.sr3d_data[data_index]
-        elif self.dataset == 'nr3d':
+        elif self.dataset_type == 'nr3d':
             data = self.nr3d_data[data_index]
         else:
             data = self.scanrefer_data[data_index]
-        if (self.dataset == 'sr3d' or self.dataset == 'nr3d') and (not deal_with_human_wrong_case) and (data['correct_guess'] in ['False', 'FALSE', 'false']):
+        if (self.dataset_type == 'sr3d' or self.dataset_type == 'nr3d') and (not deal_with_human_wrong_case) and (data['correct_guess'] in ['False', 'FALSE', 'false']):
             return -1, -1, -1
-        if (self.dataset == 'sr3d' or self.dataset == 'nr3d') and (not deal_with_not_mention_target_class) and (data['mentions_target_class'] in ['False', 'FALSE', 'false']):
+        if (self.dataset_type == 'sr3d' or self.dataset_type == 'nr3d') and (not deal_with_not_mention_target_class) and (data['mentions_target_class'] in ['False', 'FALSE', 'false']):
             return -2, -2, -2
         # 读入scan_id
-        scan_id = data['scene_id'] if self.dataset == 'scanrefer' else data['scan_id']
+        scan_id = data['scene_id'] if self.dataset_type == 'scanrefer' else data['scan_id']
         if to_print:
             print("scan_id:", scan_id)
 
         # 读入refered class and object ids
-        target_class = data['object_name'] if self.dataset == 'scanrefer' else data["instance_type"]
-        target_id = data['object_id'] if self.dataset == 'scanrefer' else data["target_id"]
+        target_class = data['object_name'] if self.dataset_type == 'scanrefer' else data["instance_type"]
+        target_id = data['object_id'] if self.dataset_type == 'scanrefer' else data["target_id"]
 
         # 读入utterance，根据情况补上句点
-        utterance = data['description'] if self.dataset == 'scanrefer' else data["utterance"]
+        utterance = data['description'] if self.dataset_type == 'scanrefer' else data["utterance"]
         if not utterance.endswith("."):
             utterance += "."
 
         # 读入sr3d的reference type, distractors_ids, achor_types和anchor_ids
-        if self.dataset == 'sr3d':
+        if self.dataset_type == 'sr3d':
             reference_type = data["coarse_reference_type"]
             distractor_ids = eval(data["distractor_ids"])
             anchor_classes = data["anchors_types"]
             anchor_ids = eval(data["anchor_ids"])
 
         # 读入nr3d 的一些信息
-        elif self.dataset == 'nr3d':
+        elif self.dataset_type == 'nr3d':
             mentions_target_class, uses_object_lang, uses_spatial_lang, uses_color_lang, uses_shape_lang = data["mentions_target_class"], data["uses_object_lang"], data["uses_spatial_lang"], data["uses_color_lang"], data["uses_shape_lang"]
 
         # 读入scanrefer的一些信息
         else:
             annotation_id = data['ann_id']
-            camera_info_aligned = self.get_scanrefer_camera_info_aligned(scan_id, target_id, annotation_id)
+            camera_info_aligned = get_scanrefer_camera_info_aligned(os.path.join(self.script_root, "data"), scan_id, target_id, annotation_id)
 
         # 读入事先准备好的物体信息，即npy文件
-        npy_path_train = os.path.join(self.scannet_data_root, "objects_info_%s" % self.scanrefer_tool_name, "objects_info_%s_%s.npy" % (self.scanrefer_tool_name, scan_id)) if (self.dataset == 'scanrefer' and not self.use_gt_box) else os.path.join(self.scannet_data_root, "objects_info", "objects_info_%s.npy" % scan_id)
-        # npy_path_test=self.scannet_data_root+"/test/objects_info_%s/objects_info_%s_"%(self.scanrefer_tool_name,self.scanrefer_tool_name) +scan_id + ".npy" if (self.dataset=='scanrefer' and not self.use_gt_box) else self.scannet_data_root+"/test/objects_info/objects_info_"+scan_id+".npy"
+        npy_path_train = os.path.join(self.scannet_data_root, "objects_info_%s" % self.scanrefer_tool_name, "objects_info_%s_%s.npy" % (self.scanrefer_tool_name, scan_id)) if (self.dataset_type == 'scanrefer' and not self.use_gt_box) else os.path.join(self.scannet_data_root, "objects_info", "objects_info_%s.npy" % scan_id)
+        # npy_path_test=self.scannet_data_root+"/test/objects_info_%s/objects_info_%s_"%(self.scanrefer_tool_name,self.scanrefer_tool_name) +scan_id + ".npy" if (self.dataset_type=='scanrefer' and not self.use_gt_box) else self.scannet_data_root+"/test/objects_info/objects_info_"+scan_id+".npy"
         # if os.path.exists(npy_path_train):
         #     npy_path=npy_path_train
         # elif os.path.exists(npy_path_test):
@@ -599,11 +388,11 @@ class Refer3d:
         objects_info = np.load(npy_path, allow_pickle=True)  # objects_info是gt或3d segmentation得到的场景中所有物体的信息
 
         # 如果是scanrefer且给了camera position和lookat，那么滤掉camera后面的物体
-        if self.dataset == 'scanrefer' and self.use_camera_position and self.filter_behind_obj:
+        if self.dataset_type == 'scanrefer' and self.use_camera_position and self.filter_behind_obj:
             objects_info = self.filter_out_obj_behind_camera(objects_info, camera_info_aligned)
 
         # 如果是scanrefer且不用gt box，要根据confidential score筛选一下
-        if self.dataset == 'scanrefer' and not self.use_gt_box:
+        if self.dataset_type == 'scanrefer' and not self.use_gt_box:
             objects_info_f = []
             for obj in objects_info:
                 score = obj.get('score')
@@ -623,7 +412,7 @@ class Refer3d:
         is_unique = True
 
         # 如果是sr3d就只需要target，distractor和anchor，不用object filter
-        if self.dataset == 'sr3d':
+        if self.dataset_type == 'sr3d':
             objects_related = []
             anchor_has_front = True
             objects_related.append(objects_info[int(target_id)])
@@ -646,25 +435,25 @@ class Refer3d:
             objects_related = objects_info if (relevant_ids is None) else [obj for obj in objects_info if obj['id'] in relevant_ids]
 
         # # 对于sr3d记录anchor_has_front
-        # if self.dataset=='sr3d':
+        # if self.dataset_type=='sr3d':
         #     anchor_has_front=True
         #     for id in anchor_ids:
         #         anchor_has_front=anchor_has_front and objects_info[int(id)]['has_front']
 
         # 获取场景的中心坐标
-        # scene_center=self.get_scene_center(objects_related)
-        scene_center = self.get_scene_center(objects_info)  # 注意这里应该用所有物体的信息，而不只是relevant
+        # scene_center=get_scene_center(objects_related)
+        scene_center = get_scene_center(objects_info)  # 注意这里应该用所有物体的信息，而不只是relevant
 
         # 生成prompt中的背景信息部分
         prompt = scan_id + ":objs with quant description based on r-h Cartesian coord sys with x-y-z axes, x-y plane=ground, z-axis=up/down. coords format [x, y, z].\n"
-        if self.dataset == 'nr3d':
-            prompt = prompt + "Scene center:%s. If no direction vector, observer at center for obj orientation.\n" % self.remove_spaces(str(scene_center))
-        elif self.dataset == 'scanrefer':
+        if self.dataset_type == 'nr3d':
+            prompt = prompt + "Scene center:%s. If no direction vector, observer at center for obj orientation.\n" % remove_spaces(str(scene_center))
+        elif self.dataset_type == 'scanrefer':
             if self.use_camera_position:
-                prompt = prompt + "Scene center:%s.\n" % self.remove_spaces(str(scene_center))
-                prompt = prompt + "Observer position:%s.\n" % self.remove_spaces(str(self.round_list(camera_info_aligned['position'], 2)))   
+                prompt = prompt + "Scene center:%s.\n" % remove_spaces(str(scene_center))
+                prompt = prompt + "Observer position:%s.\n" % remove_spaces(str(round_list(camera_info_aligned['position'], 2)))   
             else:
-                prompt = prompt + "Scene center:%s. If no direction vector, observer at center for obj orientation.\n" % self.remove_spaces(str(scene_center))
+                prompt = prompt + "Scene center:%s. If no direction vector, observer at center for obj orientation.\n" % remove_spaces(str(scene_center))
 
         prompt = prompt + "objs list:\n"
         lines = []
@@ -672,25 +461,25 @@ class Refer3d:
         for obj in objects_related:
             # 位置信息，保留2位小数
             center_position = obj['center_position']
-            center_position = self.round_list(center_position, 2)
+            center_position = round_list(center_position, 2)
             # size信息，保留2位小数
             size = obj['size']
-            size = self.round_list(size, 2)
+            size = round_list(size, 2)
             # extension信息，保留2位小数
             extension = obj['extension']
-            extension = self.round_list(extension, 2)
+            extension = round_list(extension, 2)
             # 方向信息，用方向向量表示. 注意，scanrefer由于用的不是scannet原始obj id，所以不能用方向信息
-            if obj['has_front'] and self.dataset != 'scanrefer':
+            if obj['has_front'] and self.dataset_type != 'scanrefer':
                 front_point = np.array(obj['front_point'])
                 center = np.array(obj['obb'][0:3])
                 direction_vector = front_point - center
                 direction_vector_normalized = direction_vector / np.linalg.norm(direction_vector)
                 # 再计算左和右的方向向量，全部保留两位小数
-                front_vector = self.round_list(direction_vector_normalized, 2)
+                front_vector = round_list(direction_vector_normalized, 2)
                 up_vector = np.array([0, 0, 1])
-                left_vector = self.round_list(np.cross(direction_vector_normalized, up_vector), 2)
-                right_vector = self.round_list(np.cross(up_vector, direction_vector_normalized), 2)
-                behind_vector = self.round_list(-np.array(front_vector), 2)
+                left_vector = round_list(np.cross(direction_vector_normalized, up_vector), 2)
+                right_vector = round_list(np.cross(up_vector, direction_vector_normalized), 2)
+                behind_vector = round_list(-np.array(front_vector), 2)
                 # 生成方向信息
                 direction_info = ";direction vectors:front=%s,left=%s,right=%s,behind=%s\n" % (front_vector, left_vector, right_vector, behind_vector)
                 #
@@ -698,33 +487,33 @@ class Refer3d:
                 direction_info = "\n"  # 未知方向向量就啥都不写
 
             # sr3d，给出center、size
-            if self.dataset == 'sr3d':
+            if self.dataset_type == 'sr3d':
                 if self.obj_info_ablation_type == 1:
                     # no size
-                    line = f'{obj["label"]},id={obj["id"]},ctr={self.remove_spaces(str(center_position))}'
+                    line = f'{obj["label"]},id={obj["id"]},ctr={remove_spaces(str(center_position))}'
                 elif self.obj_info_ablation_type == 2:
                     # min+max
                     line = f'{obj["label"]},id={obj["id"]},xmin={np.round(center_position[0]-size[0]/2, 2)},xmax={np.round(center_position[0]+size[0]/2, 2)},ymin={np.round(center_position[1]-size[1]/2, 2)},ymax={np.round(center_position[1]+size[1]/2, 2)},zmin={np.round(center_position[2]-size[2]/2, 2)},zmax={np.round(center_position[2]+size[2]/2, 2)}'
                 elif self.obj_info_ablation_type == 3:
                     # reversed
-                    line = f'size={self.remove_spaces(str(size))},ctr={self.remove_spaces(str(center_position))},id={obj["id"]},{obj["label"]}'
+                    line = f'size={remove_spaces(str(size))},ctr={remove_spaces(str(center_position))},id={obj["id"]},{obj["label"]}'
                 else:
                     # vanilla
-                    line = f'{obj["label"]},id={obj["id"]},ctr={self.remove_spaces(str(center_position))},size={self.remove_spaces(str(size))}'
+                    line = f'{obj["label"]},id={obj["id"]},ctr={remove_spaces(str(center_position))},size={remove_spaces(str(size))}'
 
             # nr3d和scanrefer，给出center、size、color
             else:
-                rgb = obj['median_rgba'][0:3] if (self.dataset == 'scanrefer' and not self.use_gt_box) else obj['avg_rgba'][0:3]
-                hsl = self.round_list(self.rgb_to_hsl(rgb), 2)
+                rgb = obj['median_rgba'][0:3] if (self.dataset_type == 'scanrefer' and not self.use_gt_box) else obj['avg_rgba'][0:3]
+                hsl = round_list(rgb_to_hsl(rgb), 2)
 
-                # line="%s,id=%s,ctr=%s,size=%s,RGB=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(rgb) )) #原版rgb
-                # line="%s,id=%s,ctr=%s,size=%s,HSL=%s" %(obj['label'], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsl))) #rgb换成hsl
-                line = "%s(relevant to %s),id=%s,ctr=%s,size=%s,HSL=%s" % (obj['label'], id_to_name_in_description[obj['id']], obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsl)))  # 格式：name=原名称(description里的名称)
+                # line="%s,id=%s,ctr=%s,size=%s,RGB=%s" %(obj['label'], obj['id'], remove_spaces(str(center_position)), remove_spaces(str(size)), remove_spaces(str(rgb) )) #原版rgb
+                # line="%s,id=%s,ctr=%s,size=%s,HSL=%s" %(obj['label'], obj['id'], remove_spaces(str(center_position)), remove_spaces(str(size)), remove_spaces(str(hsl))) #rgb换成hsl
+                line = "%s(relevant to %s),id=%s,ctr=%s,size=%s,HSL=%s" % (obj['label'], id_to_name_in_description[obj['id']], obj['id'], remove_spaces(str(center_position)), remove_spaces(str(size)), remove_spaces(str(hsl)))  # 格式：name=原名称(description里的名称)
                 # if id_to_name_in_description[obj['id']]=='room':
                 #     name=obj['label']
                 # else:
                 #     name=id_to_name_in_description[obj['id']]
-                # line="%s,id=%s,ctr=%s,size=%s,HSL=%s" %(name, obj['id'], self.remove_spaces(str(center_position)), self.remove_spaces(str(size)), self.remove_spaces(str(hsl) )) # 格式：name=description里的名称
+                # line="%s,id=%s,ctr=%s,size=%s,HSL=%s" %(name, obj['id'], remove_spaces(str(center_position)), remove_spaces(str(size)), remove_spaces(str(hsl) )) # 格式：name=description里的名称
             lines.append(line + direction_info)
         if self.obj_info_ablation_type == 4:
             random.seed(0)
@@ -733,11 +522,11 @@ class Refer3d:
         # prompt中的要求
         line = "Instruction:find the one described object in description: \n\"%s\"\n" % utterance
         prompt = prompt + line
-        # if self.dataset=='sr3d':
+        # if self.dataset_type=='sr3d':
         #     prompt=prompt+get_principle_sr3d(utterance) if self.use_principle else prompt
         # else:
         #     prompt=prompt+get_principle(utterance,self.use_priority) if self.use_principle else prompt
-        # if not self.dataset=='sr3d':
+        # if not self.dataset_type=='sr3d':
         #     # prompt=prompt+" Howerver, if the direction vector of A is not provided, you should use other information to identify the referred object instead of assuming a direction vector."
 
         prompt = prompt + "\nThere is exactly one answer, so if you receive multiple answers, consider other constraints; if get no answers, loosen constraints."
@@ -759,10 +548,10 @@ class Refer3d:
             print("--------------------------------------------")
             print("Right answer:", target_id)
             print("")
-        if self.dataset == 'sr3d':
+        if self.dataset_type == 'sr3d':
             relevant_ids = None
             info = (scan_id, target_id, target_class, distractor_ids, reference_type, utterance, anchor_has_front)
-        elif self.dataset == 'nr3d':
+        elif self.dataset_type == 'nr3d':
             info = (scan_id, target_id, target_class, utterance, mentions_target_class, uses_object_lang, uses_spatial_lang, uses_color_lang, uses_shape_lang, object_filter, target_dialogue_path)
         else:
             gt_box = self.get_scanrefer_gt_box(scan_id, target_id)
@@ -811,7 +600,7 @@ class Refer3d:
         @param  line_numbers: a list of data record indices. for sr3d and nr3d, the minimum is 2. for scanrefer, it's 0.
         """
         # first load the refering dataset.
-        self.load_refer_dataset(line_numbers)
+        load_refer_dataset(self, line_numbers)
 
         # create a table for recording results. format:
         #       0     #     1   #       2        #     3     #     4     #      5     #          6            #         7
@@ -831,35 +620,37 @@ class Refer3d:
         print("formatted_time:", formatted_time)
 
         # create a result folder for the chosen test mode if it does not exist.
-        if not os.path.exists(self.script_root + self.result_folder_name):
-            os.makedirs(self.script_root + self.result_folder_name)
+        result_folder = os.path.join(self.script_root, self.result_folder_name)
+        if not os.path.exists(result_folder):
+            os.makedirs(result_folder)
 
         # the subfolder of the current experiment. named after the time.
-        results_sub_folder = self.script_root + self.result_folder_name + formatted_time + '/'
+        # results_sub_folder = self.script_root + self.result_folder_name + formatted_time + '/'
+        results_sub_folder = os.path.join(result_folder, formatted_time)
         if not os.path.exists(results_sub_folder):
             os.makedirs(results_sub_folder)
 
         # path of relevant files.
-        process_log_file = results_sub_folder + "%s-progress.log" % formatted_time
-        success_log_file = results_sub_folder + "%s-success.log" % formatted_time
-        failure_log_file = results_sub_folder + "%s-failure.log" % formatted_time
-        result_npy_file = results_sub_folder + "%s.npy" % formatted_time
-        dialogue_json_folder = results_sub_folder + "%s_dialogue_jsons/" % formatted_time
+        process_log_file = os.path.join(results_sub_folder, "%s-progress.log" % formatted_time)
+        success_log_file = os.path.join(results_sub_folder, "%s-success.log" % formatted_time)
+        failure_log_file = os.path.join(results_sub_folder, "%s-failure.log" % formatted_time)
+        result_npy_file =  os.path.join(results_sub_folder, "%s.npy" % formatted_time)
+        dialogue_json_folder = os.path.join(results_sub_folder, "%s_dialogue_jsons" % formatted_time)
         os.makedirs(dialogue_json_folder)
 
         # iterate through the chosen part of dataset
         for idx, line_number in enumerate(line_numbers):
             # print and record the process
-            print("\n\nProcessing %s line %d, %d/%d." % (self.dataset, line_number, idx + 1, dataset_len))
+            print("\n\nProcessing %s line %d, %d/%d." % (self.dataset_type, line_number, idx + 1, dataset_len))
 
             with open(process_log_file, 'a') as f:
                 if idx == 0:
                     f.write(self.refer_dataset_path + '\n')
                     f.write(str(list(line_numbers)) + '\n')
-                f.write("\nProcessing %s line %d, %d/%d. " % (self.dataset, line_number, idx + 1, dataset_len))
+                f.write("\nProcessing %s line %d, %d/%d. " % (self.dataset_type, line_number, idx + 1, dataset_len))
 
             # for scanrefer, check if answer might exist. if not, record this and save.
-            if self.dataset == 'scanrefer':
+            if self.dataset_type == 'scanrefer':
                 exist, info = self.scanrefer_answer_exist(line_number, iou_thr=0.25)
                 scan_id, target_id, target_class, utterance, annotation_id, gt_box, iou_max, iou_max_object = info
                 results_table[idx][9] = exist  # correct_answer_exist
@@ -906,11 +697,11 @@ class Refer3d:
                 continue
                 
             # read some information from info
-            if self.dataset == 'sr3d':
+            if self.dataset_type == 'sr3d':
                 scan_id, target_id, target_class, distractor_ids, reference_type, utterance, anchor_has_front = info
                 object_filter = ObjectFilter()
                 prev_of_dialogue_path = None
-            elif self.dataset == 'nr3d':
+            elif self.dataset_type == 'nr3d':
                 scan_id, target_id, target_class, utterance, mentions_target_class, uses_object_lang, uses_spatial_lang, uses_color_lang, uses_shape_lang, object_filter, prev_of_dialogue_path = info
             else:
                 scan_id, target_id, target_class, utterance, annotation_id, objects_related, gt_box, object_filter, prev_of_dialogue_path, is_unique = info
@@ -948,28 +739,28 @@ class Refer3d:
                 print("last_line:", last_line)
 
             # 从last_line中获取answer_id，如果格式不符合要求则从relevant_ids中随机选取
-            random_choice_list = np.append(distractor_ids, target_id) if self.dataset == 'sr3d' else relevant_ids
+            random_choice_list = np.append(distractor_ids, target_id) if self.dataset_type == 'sr3d' else relevant_ids
             answer_id, wrong_return_format = self.extract_answer_id_from_last_line(last_line, random_choice_list)
 
             # 对于scanrefer，要找到answer_id对应的box并计算iou
-            if self.dataset == 'scanrefer':
+            if self.dataset_type == 'scanrefer':
                 for obj in objects_related:
                     if obj['id'] == answer_id:
                         answer_object = obj
                         break
                 # answer_object=objects_related[answer_id]
-                answer_box = self.center_size_to_extension(np.append(answer_object['center_position'], answer_object['size']))
-                iou = self.calc_iou(answer_box, gt_box)
+                answer_box = center_size_to_extension(np.append(answer_object['center_position'], answer_object['size']))
+                iou = calc_iou(answer_box, gt_box)
 
             # 在表格中记录相关信息
             results_table[idx][0] = line_number
             results_table[idx][1] = scan_id
             results_table[idx][3] = target_id
             results_table[idx][4] = answer_id
-            if self.dataset == 'sr3d':
+            if self.dataset_type == 'sr3d':
                 results_table[idx][2] = reference_type
                 results_table[idx][6] = anchor_has_front
-            elif self.dataset == 'nr3d':
+            elif self.dataset_type == 'nr3d':
                 results_table[idx][2] = 'None'
                 results_table[idx][6] = mentions_target_class
                 results_table[idx][7] = uses_object_lang
@@ -989,7 +780,7 @@ class Refer3d:
             object_filter.print_pretext(to_print_out=False)
 
             # 对于sr3d和nr3d，比较answer_id和target_id来判断是否回答正确
-            if self.dataset == 'sr3d' or self.dataset == 'nr3d':
+            if self.dataset_type == 'sr3d' or self.dataset_type == 'nr3d':
                 if str(answer_id) == str(target_id):
                     answer_correct = True
                     print("answer correct.")
@@ -1101,23 +892,25 @@ class Refer3d:
 
     def self_correction_dataset(self, result_folder_path, formatted_time, line_number_list):
         # 首先确定refer数据集
-        refer_dataset = self.load_refer_dataset()
+        refer_dataset = load_refer_dataset(self)
 
         # 定义dialogue文件夹路径
-        dialogue_folder_path = "%s%s/%s_dialogue_jsons/" % (result_folder_path, formatted_time, formatted_time)
+        # dialogue_folder_path = "%s%s/%s_dialogue_jsons/" % (result_folder_path, formatted_time, formatted_time)
+        dialogue_folder_path = os.path.join(result_folder_path, formatted_time, "%s_dialogue_jsons"%formatted_time)
 
         # 遍历指定line_number_list
         for line_number in line_number_list:
             # 获取相关数据
             data_line = refer_dataset[line_number]
-            scan_id = data_line['scene_id'] if self.dataset == 'scanrefer' else data_line['scan_id']
-            target_id = data_line['object_id'] if self.dataset == 'scanrefer' else data_line['target_id']
-            target_class = data_line['object_name'] if self.dataset == 'scanrefer' else data_line['instance_type']
+            scan_id = data_line['scene_id'] if self.dataset_type == 'scanrefer' else data_line['scan_id']
+            target_id = data_line['object_id'] if self.dataset_type == 'scanrefer' else data_line['target_id']
+            target_class = data_line['object_name'] if self.dataset_type == 'scanrefer' else data_line['instance_type']
             # 定义原始failure dialogue的路径
-            dialogue_path = dialogue_folder_path + "%d_%s_%s_refer_failure.json" % (line_number, scan_id, target_id)
+            dialogue_path = os.path.join(dialogue_folder_path, "%d_%s_%s_refer_failure.json" % (line_number, scan_id, target_id) )
             # correction dialogue的路径
             correction_dialogue_name = "%d_%s_%s_refer_correction.json" % (line_number, scan_id, target_id)
-            correction_dialogue_path = dialogue_folder_path + correction_dialogue_name
+            # correction_dialogue_path = dialogue_folder_path + correction_dialogue_name
+            correction_dialogue_path = os.path.join(dialogue_folder_path, correction_dialogue_name)
             # 检查correction dialogue是否存在，如果已经存在则跳过
             if os.path.exists(correction_dialogue_path):
                 print("correction dialogue %s already exists! skipped." % correction_dialogue_path)
@@ -1161,438 +954,9 @@ class Refer3d:
         with open(log_file_path, 'a') as f:
             f.write(info)
 
-    def get_easy_info(self, line_number) -> bool:
-        # 对于sr3d和nr3d，检查line_number对应数据的难度。
-        # 同类物体（包括正确物体自身）<=2个则为easy，否则为hard
-        if self.dataset == 'sr3d':
-            refer_data = self.sr3d_data[int(line_number)]
-            distractor_ids = eval(refer_data['distractor_ids'])
-            # print(distractor_ids)
-            is_easy = True if len(distractor_ids) <= 1 else False
-        else:
-            refer_data = self.nr3d_data[int(line_number)]
-            # nr3d的stimulus_id格式: scan_id-target_class-target_id-distractor_id1-...-distractor_idn
-            stimulus_id = refer_data['stimulus_id']
-            n_object_same_class = int(stimulus_id.split('-')[2])
-            is_easy = True if n_object_same_class <= 2 else False
-        return is_easy
-
-    def get_view_dep_info(self, line_number) -> bool:
-        # 对于sr3d和nr3d，检查utterance是否为view_dependent.对照了referit3d和butd的代码，只需要检查utterance中是否出现以下关键词
-        refer_data = self.sr3d_data[int(line_number)] if self.dataset == 'sr3d' else self.nr3d_data[int(line_number)]
-        utterance = refer_data['utterance']
-        rels = [
-            'front', 'behind', 'back', 'left', 'right', 'facing',
-            'leftmost', 'rightmost', 'looking', 'across'
-        ]
-        if self.use_original_viewdep_judge:
-            words = set(utterance.split())  # ... on the left.
-            return any(rel in words for rel in rels)
-        else:
-            return any(rel in utterance for rel in rels)
-
-    def get_left_right_info(self, line_number) -> bool:
-        refer_data = self.sr3d_data[int(line_number)] if self.dataset == 'sr3d' else self.nr3d_data[int(line_number)]
-        utterance = refer_data['utterance']
-        rels = [
-            'left', 'right',
-            'leftmost', 'rightmost'
-        ]
-        if self.use_original_viewdep_judge:
-            words = set(utterance.split())
-            return any(rel in words for rel in rels)
-        else:
-            return any(rel in utterance for rel in rels)
-
-    def get_ordinal_info(self, line_number) -> bool:
-        refer_data = self.sr3d_data[int(line_number)] if self.dataset == 'sr3d' else self.nr3d_data[int(line_number)]
-        utterance = refer_data['utterance']
-        rels = [
-            'from left', 'from right',
-            'from the left', 'from the right'
-        ]
-        # words = set(utterance.split())
-        return any(rel in utterance for rel in rels)
-
-    def get_correct_guess_info(self, line_number) -> bool:
-        # print(self.nr3d_data.keys())
-        refer_data = self.nr3d_data[int(line_number)]
-        if refer_data['correct_guess'] in ['True', 'TRUE', 'true']:
-            return True
-        else:
-            return False
-
-    def analyse_result_sr3d(self, result_path):
-        # 本函数用于分析nr3d的结果
-        # 首先处理path，如果是列表，就把所有的npy文件对应的np array合并
-        if isinstance(result_path, list):
-            for idx, path in enumerate(result_path):
-                result_single = np.load(path, allow_pickle=True)
-                if not idx:
-                    result = result_single
-                else:
-                    result = np.vstack([result, result_single])
-        else:
-            result = np.load(result_path, allow_pickle=True)
-        print("Sr3d results for:", result_path)
-        # result=result[0:110,:]
-        # 定义记录结果的字典
-        accuracy_count = {
-            "count_total": 0, "correct_count_total": 0,
-            "count_easy": 0, "correct_count_easy": 0,
-            "count_hard": 0, "correct_count_hard": 0,
-            "count_view_dep": 0, "correct_count_view_dep": 0,
-            "count_view_indep": 0, "correct_count_view_indep": 0,
-            "count_left_right": 0, "correct_count_left_right": 0,
-            "count_horizontal": 0, "correct_count_horizontal": 0,
-            "count_vertical": 0, "correct_count_vertical": 0,
-            "count_support": 0, "correct_count_support": 0,
-            "count_between": 0, "correct_count_between": 0,
-            "count_allocentric": 0, "correct_count_allocentric": 0
-        }
-
-        # 遍历，统计结果
-        wrong_line_numbers = []
-        for result_line in result:
-            # 首先读取line_number
-            line_number = result_line[0]  # 注意这里读进来是str
-            # 如果是空行则跳过
-            if result_line[0] == '':
-                continue
-            # 总数记数
-            accuracy_count["count_total"] += 1
-            # 获取easy信息并给easy的总数记数
-            is_easy = self.get_easy_info(line_number)
-            easy_setting = 'easy' if is_easy else 'hard'
-            accuracy_count['count_%s' % easy_setting] += 1
-            # 获取view_dependent信息并记数
-            is_view_dep = self.get_view_dep_info(line_number)
-            view_dep_setting = 'view_dep' if is_view_dep else 'view_indep'
-            accuracy_count['count_%s' % view_dep_setting] += 1
-            # 获取left_right信息并记数
-            has_left_right = self.get_left_right_info(line_number)
-            accuracy_count['count_left_right'] += 1 if has_left_right else 0
-            # 五类空间关系记数
-            reference_type = result_line[2]
-            accuracy_count["count_" + reference_type] += 1
-
-            # 给正确案例记数
-            if result_line[5] == "True":
-                accuracy_count["correct_count_total"] += 1
-                accuracy_count['correct_count_%s' % easy_setting] += 1
-                accuracy_count['correct_count_%s' % view_dep_setting] += 1
-                accuracy_count['correct_count_left_right'] += 1 if has_left_right else 0
-                accuracy_count["correct_count_" + reference_type] += 1
-
-            else:
-                wrong_line_numbers.append(eval(result_line[0]))
-
-        # 打印准确率
-        for name in ['total', 'easy', 'hard', 'view_dep', 'view_indep', 'left_right', 'horizontal', 'vertical', 'support', 'between', 'allocentric']:
-            print(name + " accuracy:")
-            correct = accuracy_count["correct_count_" + name]
-            total = accuracy_count["count_" + name]
-            percentage = -1 if total == 0 else correct / total * 100
-            print("%.2f%% (%d/%d)" % (percentage, correct, total))
-        print(f' & {round(accuracy_count["correct_count_horizontal"]/accuracy_count["count_horizontal"]*100, 1)} & {round(accuracy_count["correct_count_vertical"]/accuracy_count["count_vertical"]*100, 1)} & {round(accuracy_count["correct_count_support"]/accuracy_count["count_support"]*100, 1)} & {round(accuracy_count["correct_count_between"]/accuracy_count["count_between"]*100, 1)} & {round(accuracy_count["correct_count_allocentric"]/accuracy_count["count_allocentric"]*100, 1)} & {round(accuracy_count["correct_count_total"]/accuracy_count["count_total"]*100, 1)}\\\\')
-
-    def analyse_result_nr3d(self, result_path, skip_human_wrong_cases=True):
-        # 本函数用于分析nr3d的结果
-        # 首先处理path，如果是列表，就把所有的npy文件对应的np array合并
-        if isinstance(result_path, list):
-            for idx, path in enumerate(result_path):
-                result_single = np.load(path, allow_pickle=True)
-                if not idx:
-                    result = result_single
-                else:
-                    result = np.vstack([result, result_single])
-        else:
-            result = np.load(result_path, allow_pickle=True)
-        print("Nr3d results for:", result_path)
-        # result=result[0:110,:]
-        # 定义记录结果的字典
-        accuracy_count = {
-            "count_total": 0, "correct_count_total": 0,
-            "count_easy": 0, "correct_count_easy": 0,
-            "count_hard": 0, "correct_count_hard": 0,
-            "count_view_dep": 0, "correct_count_view_dep": 0,
-            "count_view_indep": 0, "correct_count_view_indep": 0,
-            "count_left_right": 0, "correct_count_left_right": 0,
-            "count_ordinal": 0, "correct_count_ordinal": 0,  # from the left/right
-            "count_use_object": 0, "correct_count_use_object": 0,
-            "count_use_spatial": 0, "correct_count_use_spatial": 0,
-            "count_use_color": 0, "correct_count_use_color": 0,
-            "count_use_shape": 0, "correct_count_use_shape": 0,
-        }
-
-        # 遍历，统计结果
-        wrong_line_numbers = []
-        for result_line in result:
-            # 首先读取line_number
-            line_number = result_line[0]  # 注意这里读进来是str
-            # 如果是空行则跳过
-            if result_line[0] == '':
-                continue
-            # 按照nr3d的说明，如果是人类也没有答对（correct_guess==False)，则跳过
-            if (not self.get_correct_guess_info(line_number)) and skip_human_wrong_cases:
-                continue
-            # 总数记数
-            accuracy_count["count_total"] += 1
-            # 获取easy信息并给easy的总数记数
-            is_easy = self.get_easy_info(line_number)
-            easy_setting = 'easy' if is_easy else 'hard'
-            accuracy_count['count_%s' % easy_setting] += 1
-            # 获取view_dependent信息并记数
-            is_view_dep = self.get_view_dep_info(line_number)
-            view_dep_setting = 'view_dep' if is_view_dep else 'view_indep'
-            accuracy_count['count_%s' % view_dep_setting] += 1
-            # 获取left_right信息并记数
-            has_left_right = self.get_left_right_info(line_number)
-            accuracy_count['count_left_right'] += 1 if has_left_right else 0
-            # 获取left_right信息并记数
-            is_ordinal = self.get_ordinal_info(line_number)
-            accuracy_count['count_ordinal'] += 1 if is_ordinal else 0
-            # use object,spatial,color,shape的记数
-            use_lang_settings = ['use_object', 'use_spatial', 'use_color', 'use_shape']
-            use_lang_settings_used = []
-            for i in range(4):
-                setting = use_lang_settings[i]
-                if result_line[i + 7] in ['True', 'TRUE', 'true']:
-                    accuracy_count['count_%s' % setting] += 1
-                    use_lang_settings_used.append(setting)
-
-            # 给正确案例记数
-            if result_line[5] == "True":
-                accuracy_count["correct_count_total"] += 1
-                accuracy_count['correct_count_%s' % easy_setting] += 1
-                accuracy_count['correct_count_%s' % view_dep_setting] += 1
-                accuracy_count['correct_count_left_right'] += 1 if has_left_right else 0
-                accuracy_count['correct_count_ordinal'] += 1 if is_ordinal else 0
-                for setting in use_lang_settings_used:
-                    accuracy_count['correct_count_%s' % setting] += 1
-            else:
-                wrong_line_numbers.append(eval(result_line[0]))
-
-        # 打印准确率
-        for name in ['total', 'easy', 'hard', 'view_dep', 'view_indep', 'left_right', 'ordinal'] + use_lang_settings:
-            print(name + " accuracy:")
-            correct = accuracy_count["correct_count_" + name]
-            total = accuracy_count["count_" + name]
-            percentage = -1 if total == 0 else correct / total * 100
-            print("%.2f%% (%d/%d)" % (percentage, correct, total))
-
-    def get_raw_label_2_nyu40_idx(self):
-        type2class = {'cabinet': 0, 'bed': 1, 'chair': 2, 'sofa': 3, 'table': 4, 'door': 5,
-                      'window': 6, 'bookshelf': 7, 'picture': 8, 'counter': 9, 'desk': 10, 'curtain': 11,
-                      'refrigerator': 12, 'shower curtain': 13, 'toilet': 14, 'sink': 15, 'bathtub': 16, 'others': 17}
-        scannet_labels = type2class.keys()
-        scannet2label = {label: i for i, label in enumerate(scannet_labels)}  # 从上述18个label映射到idx的字典
-
-        scannet_label_path = os.path.join(self.script_root, 'data', 'scannetv2-labels.combined.tsv')
-        lines = [line.rstrip() for line in open(scannet_label_path)]
-        lines = lines[1:]
-        raw2label = {}
-        for i in range(len(lines)):
-            label_classes_set = set(scannet_labels)
-            elements = lines[i].split('\t')
-            raw_name = elements[1]
-            nyu40_name = elements[7]
-            if nyu40_name not in label_classes_set:
-                raw2label[raw_name] = scannet2label['others']
-            else:
-                raw2label[raw_name] = scannet2label[nyu40_name]  # 从scannet中的raw_name映射到上述18个idx之一的字典
-
-        return raw2label
-
-    def get_unique_info(self, scan_id, target_class) -> bool:
-        # 本函数用于在结果npy文件没有记录scanrefer是否unique的情况下，找到这个信息
-        # 读入事先准备好的物体信息，即npy文件
-        # 做法参考了scanrefer的代码
-        npy_path_train = os.path.join(self.scannet_data_root, "objects_info", "objects_info_" + scan_id + ".npy")
-        # npy_path_test=self.scannet_data_root+"/test/objects_info/objects_info_"+scan_id+".npy"
-        if os.path.exists(npy_path_train):
-            npy_path = npy_path_train
-        # elif os.path.exists(npy_path_test):
-        #     npy_path=npy_path_test
-        else:
-            print("object_info.npy file does not exist!!! scan_id:", scan_id)
-            return None
-        objects_info = np.load(npy_path, allow_pickle=True)  # objects_info是gt或3d segmentation得到的场景中所有物体的信息
-        obj_idx_in_scene = []
-        for obj in objects_info:
-            raw_label = obj['label']
-            idx = self.raw_label_2_nyu40_idx[raw_label]
-            obj_idx_in_scene.append(idx)
-
-        target_class = " ".join(target_class.split("_"))
-        target_idx = self.raw_label_2_nyu40_idx[target_class]  # 将target class映射到18个idx
-        is_unique = True if obj_idx_in_scene.count(target_idx) <= 1 else False
-        return is_unique
-
-    def analyse_result_scanrefer(self, result_path, report_none_gt_error=True):
-        # 本函数用于分析scanrefer的结果
-        # 首先处理path，如果是列表，就把所有的npy文件对应的np array合并
-        if isinstance(result_path, list):
-            for idx, path in enumerate(result_path):
-                result_single = np.load(path, allow_pickle=True)
-                if not idx:
-                    result = result_single
-                else:
-                    result = np.vstack([result, result_single])
-        else:
-            result = np.load(result_path, allow_pickle=True)
-        print("Scanrefer results for:", result_path)
-
-        # 定义记录结果的字典
-        accuracy_count = {
-            "count_total": 0, "correct_count_total_25": 0, "correct_count_total_50": 0,
-            "count_unique": 0, "correct_count_unique_25": 0, "correct_count_unique_50": 0,
-            "count_multiple": 0, "correct_count_multiple_25": 0, "correct_count_multiple_50": 0,
-        }
-
-        # 遍历结果，在accuracy_count中记录相应数据
-        iou_list = []
-        correct_answer_exist_count = 0
-        wrong_line_numbers = []
-        wrong_line_numbers_except = []
-        for result_line in result:
-            # 如果是空行则跳过
-            if result_line[0] == '':
-                continue
-            # 读入scan_id和target_class，并获取是否unique
-            scan_id = result_line[1]
-            target_class = result_line[8]
-            if target_class == 'toilet_paper_dispense':
-                target_class = 'toilet_paper_dispenser'
-            is_unique = self.get_unique_info(scan_id, target_class)
-            # 读入iou
-            iou = eval(result_line[7])
-            # 总数记数
-            accuracy_count["count_total"] += 1
-            if is_unique:
-                accuracy_count["count_unique"] += 1
-            else:
-                accuracy_count["count_multiple"] += 1
-            # iou超过0.25/0.5则给正确数记数
-            if iou >= 0.5:
-                accuracy_count["correct_count_total_50"] += 1
-                if is_unique:
-                    accuracy_count["correct_count_unique_50"] += 1
-                else:
-                    accuracy_count["correct_count_multiple_50"] += 1
-            if iou >= 0.25:
-                accuracy_count["correct_count_total_25"] += 1
-                if is_unique:
-                    accuracy_count["correct_count_unique_25"] += 1
-                else:
-                    accuracy_count["correct_count_multiple_25"] += 1
-            else:
-                wrong_line_numbers.append(eval(result_line[0]))
-            iou_list.append(iou)
-            # 这里还需要记录该案例是否有可能找到正确答案，改为用max_iou比较
-            if eval(result_line[10]) >= self.scanrefer_iou_thr:
-                correct_answer_exist_count += 1
-                if iou <= self.scanrefer_iou_thr:
-                    wrong_line_numbers_except.append(eval(result_line[0]))  # 记录有正确答案的情况下的错误案例
-
-        # print("wrong cases line_numbers:",wrong_line_numbers)
-        # print("wrong cases line_numbers:",wrong_line_numbers_except)
-
-        # 不同setting和k的Acc@k
-        for setting in ['total', 'multiple', 'unique']:
-            for thr in [50, 25]:
-                correct = accuracy_count["correct_count_%s_%d" % (setting, thr)]
-                total = accuracy_count["count_%s" % setting]
-                percentage = -1 if total == 0 else correct / total * 100
-                print("Acc@%.2f %s:" % (thr / 100, setting))
-                print("%.2f%% (%d/%d)" % (percentage, correct, total))
-
-        # 平均iou
-        print("average iou:")
-        print("%.3f" % np.average(iou_list))
-
-        # groupfree没提供正确答案的比例
-        if report_none_gt_error and not self.use_gt_box:
-            total = accuracy_count["count_total"]
-            correct = accuracy_count["correct_count_total_50"]
-            wrong = total - correct
-            no_correct_answer = total - correct_answer_exist_count
-            percentage = "-" if wrong == 0 else no_correct_answer / wrong * 100
-            print("Percentage of error caused by 'no correct answer provided by Group Free':")
-            print("%.2f%% (%d/%d)" % (percentage, no_correct_answer, wrong))
-            # 去除上述情况后的Acc@k
-            percentage = "-" if correct_answer_exist_count == 0 else correct / correct_answer_exist_count * 100
-            print("Acc@%.2f without such cases:" % self.scanrefer_iou_thr)
-            print("%.2f%% (%d/%d)" % (percentage, correct, correct_answer_exist_count))
-
-    def analyse_result(self, result_path):
-        self.load_refer_dataset()
-        if self.dataset == 'sr3d':
-            self.analyse_result_sr3d(result_path)
-        elif self.dataset == 'nr3d':
-            self.analyse_result_nr3d(result_path, skip_human_wrong_cases=True)
-        else:
-            self.analyse_result_scanrefer(result_path, True)
-        return
-
-
-def find_number_list_in_log(log_file):
-    # 打开.log文件进行读取
-    with open(log_file, 'r') as file:
-        lines = file.readlines()
-    # 初始化存储数字的数组
-    numbers_a = []
-    # 遍历每一行并提取数字a
-    for line in lines[1:]:  # 从第二行开始
-        parts = line.split()  # 按空格分割
-        if len(parts) >= 5 and parts[0] == 'Processing' and parts[2] == 'line':
-            try:
-                a = int(parts[3].strip(','))  # 提取数字a
-                numbers_a.append(a)
-            except ValueError:
-                pass  # 如果转换失败，跳过该行
-    # 打印提取出的数字数组
-    print(numbers_a)
-    return numbers_a
-
-
-def find_number_list_in_failure_log(log_file):
-    line_numbers = []
-
-    with open(log_file, 'r') as file:
-        lines = file.readlines()
-        i = 0
-        while i < len(lines):
-            line = lines[i].strip()
-            if line.startswith("LINE NUMBER:"):
-                next_line = lines[i + 1].strip()
-                if next_line.isdigit():
-                    line_numbers.append(int(next_line))
-                i += 2
-            else:
-                i += 1
-    return line_numbers
-
-
-def random_sampling(lower, upper, mode, para):
-    if mode == 'rate':
-        rate = para
-        if not (0 < rate <= 1):
-            raise ValueError("Rate must be a value between 0 (exclusive) and 1 (inclusive).")
-        num_samples = int((upper - lower + 1) * rate)
-    elif mode == 'num':
-        num_samples = para
-    else:
-        print("Invalid mode")
-        return
-
-    samples = random.sample(range(lower, upper + 1), num_samples)
-    return samples
-
-
 def parse_args():
     import argparse
-    parser = argparse.ArgumentParser(description="Transcribe3D")
+    parser = argparse.ArgumentParser(description="Transcrib3D")
 
     parser.add_argument("--scannet_data_root", type=str, help="Path of folder that contains scannet scene folders such as 'scene0000_00'.")
     parser.add_argument("--script_root", type=str, help="Path of the Transcribe3D project folder.")
@@ -1653,7 +1017,7 @@ def main():
     if not 'use_object_filter' in eval_config:
         eval_config['use_object_filter'] = True
 
-    refer3d = Refer3d(scannet_data_root=args.scannet_data_root,
+    transcrib3d = Transcrib3D(scannet_data_root=args.scannet_data_root,
                       script_root=args.script_root,
                       dataset=eval_config['dataset'],
                       refer_dataset_path=eval_config['refer_dataset_path'],
@@ -1675,7 +1039,7 @@ def main():
     ###############################################################################
     if args.mode == 'eval':
         line_number_range = np.arange(args.range[0], args.range[1]) if args.range is not None else args.line_numbers
-        refer3d.evaluate_on_GPT(line_number_range)  # <---------
+        transcrib3d.evaluate_on_GPT(line_number_range)  # <---------
     ###############################################################################
 
     elif args.mode == 'result':
@@ -1683,11 +1047,15 @@ def main():
         formatted_time = args.ft
         if isinstance(formatted_time, list):
             print('is list')
-            result_path = ["%s%s/%s.npy" % (result_folder_name, ft, ft) for ft in formatted_time]
+            # result_path = ["%s%s/%s.npy" % (result_folder_name, ft, ft) for ft in formatted_time]
+            result_path = [os.path.join(result_folder_name, ft, f"{ft}.npy") for ft in formatted_time]
         else:
-            result_path = "%s%s/%s.npy" % (result_folder_name, formatted_time, formatted_time) if formatted_time is not None else None
+            # result_path = "%s%s/%s.npy" % (result_folder_name, formatted_time, formatted_time) if formatted_time is not None else None
+            result_path = os.path.join(result_folder_name, formatted_time, f"{formatted_time}.npy") if formatted_time is not None else None
         if result_path:
-            refer3d.analyse_result(result_path)
+            # refer3d.analyse_result(result_path)
+            config = (os.path.join(transcrib3d.script_root, "data"), transcrib3d.use_original_viewdep_judge, transcrib3d.use_gt_box, transcrib3d.scanrefer_iou_thr)
+            analyse_result(transcrib3d.dataset_type, transcrib3d.refer_dataset_path, result_path, config)
 
     elif args.mode == 'self_correct':
         """self correction"""
@@ -1695,11 +1063,11 @@ def main():
         formatted_time = args.ft
         print(formatted_time)
         for time in formatted_time:
-            refer3d.self_correction_dataset(result_folder_path=args.script_root + eval_config['result_folder_name'], formatted_time=time, line_number_list=np.arange(0, 400) if args.dataset == 'scanrefer' else np.arange(2, 400))
+            transcrib3d.self_correction_dataset(result_folder_path=args.script_root + eval_config['result_folder_name'], formatted_time=time, line_number_list=np.arange(0, 400) if args.dataset == 'scanrefer' else np.arange(2, 400))
 
     elif args.mode == "check_scanrefer":
         """check the how many cases are provided with detected boxes that has 0.5(0.25) or higher iou with gt box"""
-        refer3d.check_scanrefer_answer_exist_percentage(0.5)
+        transcrib3d.check_scanrefer_answer_exist_percentage(0.5)
 
 
 if __name__ == '__main__':

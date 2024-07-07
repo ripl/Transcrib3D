@@ -5,7 +5,6 @@ import openai
 openai.api_key = os.getenv("OPENAI_API_KEY")
 from openai import OpenAI
 client = OpenAI()
-# openai.api_key = "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"
 
 # HUGGINGFACE_MODELS = {
 #     'meta-llama/Llama-2-7b-chat-hf',
@@ -130,9 +129,9 @@ if __name__ == '__main__':
 
     config = {
         # 'model': 'gpt-4-1106-preview',
-        # 'model': 'gpt-4',
+        'model': 'gpt-4',
         # 'model': 'gpt-3.5-turbo',
-        'model': 'meta-llama/Llama-2-7b-chat-hf',
+        # 'model': 'meta-llama/Llama-2-7b-chat-hf',
         'temperature': 0,
         'top_p': 0.0,
         'max_tokens': 8192,
