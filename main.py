@@ -304,6 +304,25 @@ class Transcrib3D:
         print("%.2f%% (%d/%d)" % (percentage, answer_exist_count_multiple, total_multiple))
 
     def find_relevant_objects(self, data_index, scan_id, target_id, utterance, npy_path, use_npy_file=True, object_info_list=None, void=False):
+        """
+        Find relevant objects from the object list of the scene according to the utterance.
+
+        Parameters:
+            data_index (int): Index of the data record.
+            scan_id (str): Scan ID of the scene.
+            target_id (str): ID of the target object. Only used for file naming.
+            utterance (str): Utterance of the data record.
+            npy_path (str): Path of the object information .npy file.
+            use_npy_file (bool, optional): To load object list from .npy file or not. Defaults to True.
+            object_info_list (list, optional): The object list if .npy file is not used. Defaults to None.
+            void (bool, optional): TODO. Defaults to False.
+
+        Returns:
+            list: A list of IDs of the relevant objects.
+            dict: Key - object names in the utterance. Value: a list of objects relevant to that object name.
+            ObjectFilter: an instance of the used ObjectFilter.
+            str: TODO target_dialogue_path
+        """
 
         if void:  # not filter, return all objects
             object_filter = ObjectFilter()
@@ -629,21 +648,29 @@ class Transcrib3D:
         return prompt, info, relevant_ids
 
     def extract_answer_id_from_last_line(self, last_line, random_choice_list=[0,]):
-        # 如果没有按照预期格式回复则随机选取(Sr3d)或直接选成0(Nr3d和Scanrefer);按预期格式恢复则提取答案
+        """
+        Extract answer_id from the last line of response. Desired format: "Now the answer is complete -- {'ID': xxx} ". If last_line does not contains the desired format, do random choice.
+
+        Parameters:
+            last_line (str): The last line of LLM response.
+            random_choice_list (list, optional): A list of object ids for random choice. Defaults to [0,].
+
+        Returns:
+            int: Answer id extracted.
+            bool: Wrong return format or not.
+            
+        """
         wrong_return_format = False
         last_line_split = last_line.split('--')
-        # 使用正则表达式从字符串中提取字典部分
+        # Using regular expressions to extract dictionary parts.
         pattern = r"\{[^\}]*\}"
         match = re.search(pattern, last_line_split[-1])
         if match:
-            # 获取匹配的字典字符串
             matched_dict_str = match.group()
             try:
-                # 解析字典字符串为字典对象
                 extracted_dict = ast.literal_eval(matched_dict_str)
                 print(extracted_dict)
                 answer_id = extracted_dict['ID']
-                # 如果确实以 Now the answer is complete -- {'ID': xxx} 的格式回复了，但是xxx不是数字（例如是None），也能随机选。
                 if not isinstance(answer_id, int):
                     if isinstance(answer_id, list) and all([isinstance(e, int) for e in answer_id]):
                         print("Wrong answer format: %s. random choice from this list" % str(answer_id))
@@ -663,22 +690,27 @@ class Transcrib3D:
 
         return answer_id, wrong_return_format
 
-    def evaluate_on_GPT(self, line_numbers):
+    def evaluation(self, line_numbers:list):
         """
-        @descr  the most important function. run evluation for the given data records decided by the line_numbers.  then save the result table to npy file.
-        @param  line_numbers: a list of data record indices. for sr3d and nr3d, the minimum is 2. for scanrefer, it's 0.
+        Run evluation for the given data records defined by the line_numbers. Then save the result table to an .npy file.
+        
+        Parameters:
+            line_numbers (list):  A list of data record indices. For sr3d and nr3d (.csv files), line number starts from 2. For scanrefer (.json files), line number starts from 0.
+        
+        Returns:
+            str: The start time of this evaluation, in format "%Y-%m-%d-%H-%M-%S".
         """
         # first load the refering dataset.
         load_refer_dataset(self, line_numbers)
 
         # create a table for recording results. format:
-        #       0     #     1   #       2        #     3     #     4     #      5     #          6            #         7
+        #       0     #     1   #       2        #     3     #     4     #      5     #          6            #         7        #          8        #         9            #   10      #    
         # sr3d:
         # line_number # scan_id # reference_type # target_id # answer_id # is_correct #  anchors_has_front    #
         # nr3d:
-        # line_number # scan_id #    None        # target_id # answer_id # is_correct # mentions_target_class # uses_object_lang # uses_spatial_lang # uses_color_lang # uses_shape_lang
+        # line_number # scan_id #    None        # target_id # answer_id # is_correct # mentions_target_class # uses_object_lang # uses_spatial_lang #   uses_color_lang    # uses_shape_lang
         # scanrefer:
-        #  dscrp_num  # scan_id #    ann_id      # target_id # answer_id #   gt_box   #     answer_box        #     iou          #  object_class      # correct_answer_exist # iou_max   # is_unique
+        #  dscrp_num  # scan_id #    ann_id      # target_id # answer_id #   gt_box   #     answer_box        #     iou          #  object_class     # correct_answer_exist # iou_max   # is_unique
 
         dataset_len = len(line_numbers)
         results_table = np.zeros([dataset_len, 12], dtype='<U21')
@@ -694,7 +726,6 @@ class Transcrib3D:
             os.makedirs(result_folder)
 
         # the subfolder of the current experiment. named after the time.
-        # results_sub_folder = self.workspace_path + self.result_folder_name + formatted_time + '/'
         results_sub_folder = os.path.join(result_folder, formatted_time)
         if not os.path.exists(results_sub_folder):
             os.makedirs(results_sub_folder)
@@ -747,7 +778,7 @@ class Transcrib3D:
             self.time_consumed_this_ques = 0
             self.token_usage_this_ques = 0
 
-            # generate prompt
+            # Generate prompt
             prompt, info, relevant_ids = self.generate_prompt(line_number, to_print=True)
             if prompt is None:
                 with open(process_log_file, 'a') as f:
@@ -776,7 +807,7 @@ class Transcrib3D:
                 scan_id, target_id, target_class, utterance, annotation_id, objects_related, gt_box, object_filter, prev_of_dialogue_path, is_unique = info
             object_filter: ObjectFilter
 
-            # 尝试获取GPT回复。如果出现Retry Error，那就last_line随便设置，最终导致wrong_format=True，随机选取
+            # send the prompt to LLM and try to get response. If an RetryError occurs, randomly set last_line to cause wrong_format==True and trigger random choice.
             get_gpt_response_success = True
             try:
                 if self.use_code_interpreter:
@@ -785,7 +816,7 @@ class Transcrib3D:
                 else:
                     gpt_dialogue = Dialogue(**self.gpt_config)
                     response = self.get_gpt_response_no_code_interpreter(prompt, gpt_dialogue)
-                    code_interpreter = gpt_dialogue  # 这里必须给code_interpreter绑定一个值
+                    code_interpreter = gpt_dialogue  # must bind an value to code_interpreter
                 print("\n*** This question: token usage=%d, time consumed=%ss, TPM=%.2f ***" % (self.token_usage_this_ques, self.time_consumed_this_ques, self.token_usage_this_ques / self.time_consumed_this_ques * 60))
                 print("*** Whole run: token usage=%d, time consumed=%ss, TPM=%.2f ***\n" % (self.token_usage_whole_run, self.time_consumed_whole_run, self.token_usage_whole_run / self.time_consumed_whole_run * 60))
             except RetryError as r:
@@ -795,9 +826,9 @@ class Transcrib3D:
                 response = "Fail to get response from GPT. RetryError in func get_gpt_response"
                 last_line = "Nonesense"
                 get_gpt_response_success = False
-                code_interpreter = Dialogue(**self.gpt_config)  # 这里必须给code_interpreter绑定一个值
+                code_interpreter = Dialogue(**self.gpt_config)  # must bind an value to code_interpreter
 
-            # 处理GPT的回复 （如果成功获取）
+            # process response from LLM
             if get_gpt_response_success:
                 print("--------------------------------------------")
                 print("DIALOGUE:")
@@ -807,11 +838,11 @@ class Transcrib3D:
                 print(type(last_line))
                 print("last_line:", last_line)
 
-            # 从last_line中获取answer_id，如果格式不符合要求则从relevant_ids中随机选取
+            # extract answer_id from last_line. if the format is wrong, random choose from relevant_ids
             random_choice_list = np.append(distractor_ids, target_id) if self.dataset_type == 'sr3d' else relevant_ids
             answer_id, wrong_return_format = self.extract_answer_id_from_last_line(last_line, random_choice_list)
 
-            # 对于scanrefer，要找到answer_id对应的box并计算iou
+            # for scanrefer, find the bounding box according to answer_id and calculate its IoU with gt_box
             if self.dataset_type == 'scanrefer':
                 for obj in objects_related:
                     if obj['id'] == answer_id:
@@ -821,7 +852,7 @@ class Transcrib3D:
                 answer_box = center_size_to_extension(np.append(answer_object['center_position'], answer_object['size']))
                 iou = calc_iou(answer_box, gt_box)
 
-            # 在表格中记录相关信息
+            # record information in results_table
             results_table[idx][0] = line_number
             results_table[idx][1] = scan_id
             results_table[idx][3] = target_id
@@ -848,17 +879,17 @@ class Transcrib3D:
             code_interpreter.print_pretext(to_print_out=False)
             object_filter.print_pretext(to_print_out=False)
 
-            # 对于sr3d和nr3d，比较answer_id和target_id来判断是否回答正确
+            # for sr3d and nr3d, judge correctness by comparing answer_id with target_id
             if self.dataset_type == 'sr3d' or self.dataset_type == 'nr3d':
                 if str(answer_id) == str(target_id):
                     answer_correct = True
                     print("answer correct.")
                     results_table[idx][5] = True
-                    # 记录正确信息
+                    # log info for correct answer
                     self.log_info(line_number, scan_id, utterance, object_filter.printed_pretext, code_interpreter.printed_pretext, success_log_file, target_id, answer_id)
                     with open(process_log_file, 'a') as f:
                         f.write("answer correct.")
-                    # 如果是错误返回格式，随后蒙对的，也要记录在错误log中
+                    # if the return format is wrong, but the model got the correct answer by random choosing, this should be recorded too.
                     if wrong_return_format:
                         self.log_info(line_number, scan_id, utterance, object_filter.printed_pretext, code_interpreter.printed_pretext, failure_log_file, target_id, answer_id)
                         with open(process_log_file, 'a') as f:
@@ -868,30 +899,30 @@ class Transcrib3D:
                     print("answer wrong!")
                     results_table[idx][5] = str(False)
                     print("Error info:\nutterance: %s\ntarget_id:%s\nanswer_id:%s\nGPT last response:%s" % (utterance, str(target_id), str(answer_id), response))
-                    # 记录错误信息
+                    # log info for wrong answer
                     self.log_info(line_number, scan_id, utterance, object_filter.printed_pretext, code_interpreter.printed_pretext, failure_log_file, target_id, answer_id)
                     with open(process_log_file, 'a') as f:
                         f.write("answer wrong!")
 
-            # 对于scanrefer，按iou是否超过阈值来判断
+            # for scanrefer, judge correctness by iou
             else:
                 target_id_text = str(target_id) + "(ScanNet) / " + str(iou_max_object['id']) + "(%s)" % self.scanrefer_tool_name
                 if iou > self.scanrefer_iou_thr:
                     answer_correct = True
                     print("answer correct: IoU=%.3f" % iou)
-                    # 记录正确信息
+                    # log info for correct answer
                     self.log_info(line_number, scan_id, utterance, object_filter.printed_pretext, code_interpreter.printed_pretext, success_log_file, target_id_text, answer_id, iou, iou_max)
                     with open(process_log_file, 'a') as f:
                         f.write("answer correct. iou=%.3f" % iou)
                 else:
                     answer_correct = False
                     print("answer wrong! IoU=%.3f" % iou)
-                    # 记录错误信息
+                    # log info for wrong answer
                     self.log_info(line_number, scan_id, utterance, object_filter.printed_pretext, code_interpreter.printed_pretext, failure_log_file, target_id_text, answer_id, iou, iou_max)
                     with open(process_log_file, 'a') as f:
                         f.write("answer wrong! iou=%.3f" % iou)
 
-            # 保存对话到json文件
+            # save dialogue to .json file
             if prev_of_dialogue_path:
                 import shutil
                 shutil.copy(prev_of_dialogue_path, dialogue_json_folder)
@@ -903,7 +934,7 @@ class Transcrib3D:
             refer_json_name = "%d_%s_%s_refer_%s.json" % (line_number, scan_id, target_id, success_text)
             code_interpreter.save_pretext(dialogue_json_folder, refer_json_name)
 
-            # 保存结果表格
+            # save results_table to .npy file
             np.save(result_npy_file, results_table)
             print("results saved to: %s\n\n" % result_npy_file)
 
@@ -1108,7 +1139,7 @@ def main():
     ###############################################################################
     if args.mode == 'eval':
         line_number_range = np.arange(args.range[0], args.range[1]) if args.range is not None else args.line_numbers
-        transcrib3d.evaluate_on_GPT(line_number_range)  # <---------
+        transcrib3d.experiment(line_number_range)  # <---------
     ###############################################################################
 
     elif args.mode == 'result':
@@ -1132,7 +1163,8 @@ def main():
         formatted_time = args.ft
         print(formatted_time)
         for time in formatted_time:
-            transcrib3d.self_correction_dataset(result_folder_path=args.workspace_path + eval_config['result_folder_name'], formatted_time=time, line_number_list=np.arange(0, 400) if args.dataset_type == 'scanrefer' else np.arange(2, 400))
+            path = os.path.join(args.workspace_path, 'results', eval_config['result_folder_name'])
+            transcrib3d.self_correction_dataset(result_folder_path=path, formatted_time=time, line_number_list=np.arange(0, 400) if args.dataset_type == 'scanrefer' else np.arange(2, 400))
 
     elif args.mode == "check_scanrefer":
         """check the how many cases are provided with detected boxes that has 0.5(0.25) or higher iou with gt box"""
