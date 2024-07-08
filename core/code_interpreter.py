@@ -19,7 +19,7 @@ class CodeInterpreter(Dialogue):
         If an error occurs during code execution, the error message will be appended instead.
         If the LLM response does not contain code, the function will return. Note that only the last response content will be returned, and the entire dialogue is stored in self.pretext variable.
 
-        Parameters:
+        Args:
             user_prompt (str): The user prompt.
             namespace_for_exec (dict): Namespace used in the exec() function. This enables LLM to use variables or functions it defined in previous rounds of conversation.
             token_usage_total (int): Token usage in total in current non-recursive call of this function.

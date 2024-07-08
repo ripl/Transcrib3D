@@ -95,7 +95,7 @@ class Dialogue:
         """
         Call LLM with user prompt, get the response, append the user prompt and the response to pretext(dialogue history), and return the current response and token usage.
 
-        Parameters:
+        Args:
             user_prompt (str): The user prompt.
 
         Returns:

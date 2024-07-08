@@ -92,7 +92,7 @@ def get_scanrefer_gt_box(scan_id, object_id):
     """
     Convert a bounding box in center-size format to extension format.
 
-    Parameters:
+    Args:
         box_center_size (list): A box in in center-size format: [cx, cy, cz, sx, sy, sz].
 
     Returns:

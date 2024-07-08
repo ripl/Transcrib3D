@@ -36,7 +36,7 @@ class Transcrib3D:
         """
         Class initialization.
 
-        Parameters:
+        Args:
             workspace_path (str): Path of Transcrib3D project folder.
             scannet_data_root (str): Path to the ScanNet data folder.
             dataset_type (str): Type of refering dataset. One of [sr3d, nr3d, scanrefer].
@@ -93,7 +93,7 @@ class Transcrib3D:
         """
         Filter out objects in the half space behind the camera.
 
-        Parameters:
+        Args:
             obj_list (list): List of objects.
             camera_info (dict): A dictionary recording camera position and viewpoint.
 
@@ -117,7 +117,7 @@ class Transcrib3D:
         Filter out overlapped bounding boxes representing the same object. Box with highest confidential score
         will be kept.
 
-        Parameters:
+        Args:
             objects_info_f (list): List of objects(bounding boxes).
             iou_threshold (float): IoU threshold for overlap judgement.
 
@@ -148,7 +148,7 @@ class Transcrib3D:
         Measure the token usage and time as well.
         If the reponse does not include "Now the answer is complete", this means the answer is not done. attach an empty user message to continue the conversation.
 
-        Parameters:
+        Args:
             prompt (str): The generated prompt.
             code_interpreter (CodeInterpreter): An instance of CodeInterpreter class.
 
@@ -190,7 +190,7 @@ class Transcrib3D:
         Measure the token usage and time as well.
         If the reponse does not include "Now the answer is complete", this means the answer is not done. attach an empty user message to continue the conversation.
 
-        Parameters:
+        Args:
             objects_info_f (list): List of objects(bounding boxes).
             iou_threshold (float): IoU threshold for overlap judgement.
 
@@ -227,10 +227,21 @@ class Transcrib3D:
         return response
 
     def scanrefer_answer_exist(self, data_index, iou_thr):
-        # check whether it's possible to find the correct answer for the given index of scanrefer:
-        # if we're using some bounding boxes detected by an object detector(like group-free) or instance segmentor(like mask3d),
-        # and if the largest IoU in IoUs of gt box and all boxes detected is less than the threshold(0.25 or 0.5), then it is impossible for the rest of our model to find the correct answer.
-        # note the minimum of data_index is 0.
+        """
+        Check whether it's possible to find the correct answer for the given index of scanrefer:
+        if we're using some bounding boxes detected by an object detector(like group-free) or instance segmentor(like mask3d),
+        and if the largest IoU in IoUs of gt box and all boxes detected is less than the threshold(0.25 or 0.5), 
+        then it is impossible for the rest of our model to find the correct answer.
+        Note the minimum of data_index is 0.
+
+        Args:
+            data_index (int): Index of scanrefer dataset.
+            iou_thr (float): IoU threshold.
+
+        Returns:
+            bool: Answer exist or not.
+            tuple: Some relevant information.
+        """
         data = self.scanrefer_data[data_index]
         scan_id = data['scene_id']
         target_id = data['object_id']
@@ -268,7 +279,12 @@ class Transcrib3D:
             return False, info
 
     def check_scanrefer_answer_exist_percentage(self, iou_thr):
-        # check all data records in scanrefer and calculate the percentage that answer might exist, given the detected boxes.
+        """
+        Check all data records in scanrefer and calculate the percentage that answer might exist, given the detected boxes.
+
+        Args:
+            iou_thr (float): IoU threshold.
+        """
         self.scanrefer_data = read_json(self.refer_dataset_path)
         answer_exist_count = 0
         answer_exist_count_unique = 0
@@ -280,8 +296,8 @@ class Transcrib3D:
             exist, _ = self.scanrefer_answer_exist(idx, iou_thr)
             data = self.scanrefer_data[idx]
             answer_exist_count += exist
-            # 为unique and multiple
-            is_unique = self.get_unique_info(data['scene_id'], data['object_name'])
+            # unique or multiple. being unique means target the object is the only one of its class in the scene.
+            is_unique = get_unique_info(data['scene_id'], data['object_name'])
             if is_unique:
                 total_unique += 1
                 answer_exist_count_unique += exist
@@ -307,7 +323,7 @@ class Transcrib3D:
         """
         Find relevant objects from the object list of the scene according to the utterance.
 
-        Parameters:
+        Args:
             data_index (int): Index of the data record.
             scan_id (str): Scan ID of the scene.
             target_id (str): ID of the target object. Only used for file naming.
@@ -413,7 +429,7 @@ class Transcrib3D:
         """
         Generate prompt for one piece of data record defined by data_index.
         
-        Parameters:
+        Args:
             data_index (int): Index of self.sr3d_data/nr3d_data/scanrefer_data. Starts from 0.
             to_print (bool, optional): To print out the generated prompt or not. Defaults to True.
             deal_with_human_wrong_case (bool, optional): For nr3d, whether to deal with cases that human did not answer correctly. Recorded in data['correct_guess']. Defaults to False.
@@ -651,7 +667,7 @@ class Transcrib3D:
         """
         Extract answer_id from the last line of response. Desired format: "Now the answer is complete -- {'ID': xxx} ". If last_line does not contains the desired format, do random choice.
 
-        Parameters:
+        Args:
             last_line (str): The last line of LLM response.
             random_choice_list (list, optional): A list of object ids for random choice. Defaults to [0,].
 
@@ -694,7 +710,7 @@ class Transcrib3D:
         """
         Run evluation for the given data records defined by the line_numbers. Then save the result table to an .npy file.
         
-        Parameters:
+        Args:
             line_numbers (list):  A list of data record indices. For sr3d and nr3d (.csv files), line number starts from 2. For scanrefer (.json files), line number starts from 0.
         
         Returns:

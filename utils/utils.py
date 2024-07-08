@@ -8,7 +8,7 @@ def function_name(param1, param2):
     Detailed description explaining what the function does, the input parameters,
     the return value, and any side effects.
 
-    Parameters:
+    Args:
         param1 (type): Description of param1
         param2 (type): Description of param2
         ...
@@ -31,7 +31,7 @@ def round_list(lst:list, length:float):
     """
     Round every element in a list with certain length.
 
-    Parameters:
+    Args:
         lst (list): The input list.
         length (int): The the number of decimal places retained.
 
@@ -55,7 +55,7 @@ def center_size_to_extension(box_center_size:list):
     """
     Convert a bounding box in center-size format to extension format.
 
-    Parameters:
+    Args:
         box_center_size (list): A box in in center-size format: [cx, cy, cz, sx, sy, sz].
 
     Returns:
@@ -90,7 +90,7 @@ def calc_iou(box1:list, box2:list):
     """
     Calculate the IoU of two bounding boxes.
 
-    Parameters:
+    Args:
         box1 (list): A box in in extension format: [xmin, ymin, zmin, xmax, ymax, zmax].
         box2 (list): Another box in in extension format: [xmin, ymin, zmin, xmax, ymax, zmax].
 
@@ -116,7 +116,7 @@ def get_scene_center(objects:list):
     """
     Calculate the center of a scene containing multiple objects.
 
-    Parameters:
+    Args:
         objests (list): A list of objects. Each object is dictionary.
 
     Returns:
@@ -144,7 +144,7 @@ def rgb_to_hsv(rgb):
     """
     Convert color value in RGB format to color value in HSV format.
 
-    Parameters:
+    Args:
         rgb (list): RGB value: [r, g, b], 0-255.
 
     Returns:
@@ -175,7 +175,7 @@ def rgb_to_hsl(rgb):
     """
     Convert color value in RGB format to color value in HSL format.
 
-    Parameters:
+    Args:
         rgb (list): RGB value: [r, g, b], 0-255.
 
     Returns:
