@@ -33,7 +33,7 @@ class Dialogue:
             self.pretext = [{"role": "system", "content": self.system_message}]
 
         if 'llama' in self.model:
-            from hf_conversational import HuggingfaceConversational
+            from core.hf_conversational import HuggingfaceConversational
             from transformers import Conversation
             self.conversational = HuggingfaceConversational(
                 model_name=self.model,

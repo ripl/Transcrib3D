@@ -1,4 +1,4 @@
-from draw_obj_points import draw_points
+from tools.draw_obj_points import draw_points
 import os
 import numpy as np
 from sklearn.cluster import DBSCAN
