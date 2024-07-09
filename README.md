@@ -87,3 +87,22 @@ Check the how many cases are provided with detected boxes that has 0.5 or higher
 ```bash
 python main.py --workspace_path /path/to/Transcribe3D/project/folder/ --scannet_data_root /path/to/ScanNet/Data/ --mode check_scanrefer --dataset scanrefer --conf_idx 1
 ```
+
+## Finetuning
+We provide scripts for finetuning on open-source LLMs (e.g. codeLlama, Llama2) under `finetune` directory.
+
+### Environment
+The script uses Huggingface `trl` (https://github.com/huggingface/trl) library to perform finetuning jobs. Main dependencies include Huggingface `accelerate`, `transformers`, `datasets`, `peft`, `trl`.
+
+### Data
+We provide processed fientuning data following OpenAI finetune file protocal in `finetune/finetune_files` directory. It contains many different settings aligned as described in our paper. The original processing script is `finetune/prepare_finetuning_data.py` which processes results from the main script.
+
+### Scripts
+We provide two example shell scripts to run the finetuning jobs, one with `codellama` model (`finetune/trl_finetune_codellama_instruct.sh`) and the other with `llama2_chat` model (`finetune/trl_finetune_llama2_chat.sh`). You can also customize finetuning job using `finetune/trl_finetune.py`.
+
+### Notes
+- The finetuned open-source models (e.g. codellama, llama2) still large under performs finetuned closed-source model (gpt-3.5-turbo) as of Sep 2023. We expect the situation would change dramatically in the coming future with quickly improving open source models.
+- The resource required for finetuning is roughly 24g+ gpu memory for 7b models and 36g+ gpu memory for 13b models.
+
+
+
