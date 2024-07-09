@@ -1,8 +1,20 @@
-# Transcribe3D
+# Transcrib3D: 3D Referring Expression Resolution through Large Language Models
 
-This code repository is for internal testing only, please forgive some of its imperfections:)
+[[Paper]]() [[Website]](https://ripl.github.io/Transcrib3D/)
 
-## Install
+Authors...
+
+Abstract...
+
+Demos charts...
+
+## Bibtex
+
+```
+xxx
+```
+
+## Environment Settings
 
 For evaluation, only some simple packages are required, include *numpy*, *openai* and *tenacity*.
 
@@ -16,15 +28,21 @@ Some additional packages are required for data preprocessing:
 pip install plyfile scikit-learn scipy pandas
 ```
 
-## OpenAI API access
-Set up your OpenAI api key as an environment variable `OPENAI_API_KEY`.
+Set up your OpenAI api key as an environment variable `OPENAI_API_KEY`:
+
+```bash
+export OPENAI_API_KEY=xxx
+```
 
 ## Data Prepare
+
+TODO
+
 ~~You should have a folder(let's call it *scannet_data_root*) that has ScanNet scene folders such as *scene0000_00* under it.
 Besides the original ScanNet data, object bounding boxes are also needed(ground truth, group free or mask3d). Currently these boxes are directly provided. [Download](https://drive.google.com/drive/folders/1A1nV66J-8NVExauugvlc7X5FM2QhQzeW?usp=drive_link) them and unzip under *scannet_data_root*, so that there will also be these 3 folders under *scannet_data_root*: objects_info, objects_info_gf and objects_info_mask3d_200c.~~
 
 To make things easier, we provide the bounding boexes for each scene at `data/scannet_object_info`. Currently it only include ground truth bounding boxes (which is the setting for NR3D and SR3D from Referit3D benchmark), detected bounding boxes will be provided later. There is no need to prepare the original scannet scene data for the sole purpose of testing (original scene data are still useful for debugging and visualization).
-
+<!-- 
 ## File Structure
 
 ### main.py
@@ -41,28 +59,34 @@ The indices of full model(GPT-4, use principle, use code interpreter) for nr3d a
 This define the class *CodeInterpreter* which inherits from the class *Dialogue* defined in dialogue.py. These handle the calling of openai api and implement the code interpreter.
 
 ### object_filter_gpt4.py
-Implements the object filter which filters out irrelevant object according to the description.
+Implements the object filter which filters out irrelevant object according to the description. -->
 
 ## Evaluation
+
+### quick start
 Run the first 50 data records of *nr3d_test_sampled1000.csv* with config index 1:
 
 ```bash
-python main.py --workspace_path /path/to/Transcribe3D/project/folder --scannet_data_root /path/to/ScanNet/Data/  --mode eval --dataset nr3d --conf_idx 1 --range 2 52
+python main.py --workspace_path /path/to/Transcribe3D/project/folder --scannet_data_root /path/to/ScanNet/Data/  --mode eval --dataset_type nr3d --conf_idx 1 --range 2 52
 ```
 
 Remember to replace the paths.
 
-~~For the scannet_data_root, there should be scannet scene folders under it, such as *scene0000_00*~~
+<!-- ~~For the scannet_data_root, there should be scannet scene folders under it, such as *scene0000_00*~~
 
-~~If you are using TTIC slurm, the scannet_data_root should be */share/data/ripl/scannet_raw/train/*.~~
+~~If you are using TTIC slurm, the scannet_data_root should be */share/data/ripl/scannet_raw/train/*.~~ -->
 
 `scannet_data_root` can be set to `/path/to/Transcribe3D/project/folder/data/scannet_object_info` as we provide the GT scannet bounding boxes already.
 
-To run sr3d or scanrefer, simply modify the --dataset setting.
+### how to modify configurations
+
+To run sr3d or scanrefer, simply modify the --dataset_type setting.
 
 We test the first 300 samples for NR3D and 140 samples for SR3D in our paper.
 
-After running the evaluation, a folder which has a name starting with 'eval_results_' and containing configuration infomation will be created. Under this folder, there will be subfolders named after time.
+### result storage
+
+After running the evaluation with certian configuration, a folder which has a name starting with `eval_results_` and containing configuration infomation will be created under the `results` folder. Under this folder, there will be subfolders named after the start time of experiment.
 
 ## Analyze Result
 You might run one or more experiments of a evaluation configuration, and get some subfolders named after formatted time. The time/times are used for analyze the results. An example timestamp looks like "2023-10-26-15-48-12".
@@ -70,14 +94,17 @@ You might run one or more experiments of a evaluation configuration, and get som
 Specify the formatted time(s) after the --ft setting:
 
 ```bash
-python main.py --workspace_path /path/to/Transcribe3D/project/folder/ --scannet_data_root /path/to/ScanNet/Data/  --mode result --dataset nr3d --conf_idx 1 --ft time1 time2
+python main.py --workspace_path /path/to/Transcribe3D/project/folder/ --scannet_data_root /path/to/ScanNet/Data/  --mode result --dataset_type nr3d --conf_idx 1 --ft time1 time2
 ```
 
 ## Self Correction
+
+TODO
+
 This checks all the result dialogues given formatted time(s), self-corrects those wrong cases.
 
 ```bash
-python main.py --scannet_data_root /path/to/ScanNet/Data/ --script_root /path/to/Transcribe3D/project/folder --mode self_correct --dataset nr3d --conf_idx 1 --ft time1 time2
+python main.py --workspace_path /path/to/Transcribe3D/project/folder/ --scannet_data_root /path/to/ScanNet/Data/ --mode self_correct --dataset_type nr3d --conf_idx 1 --ft time1 time2
 ```
 
 ## Check Scanrefer
@@ -85,7 +112,7 @@ python main.py --scannet_data_root /path/to/ScanNet/Data/ --script_root /path/to
 Check the how many cases are provided with detected boxes that has 0.5 or higher iou with gt box, which indicates the upper bound of performance on Scanrefer.
 
 ```bash
-python main.py --workspace_path /path/to/Transcribe3D/project/folder/ --scannet_data_root /path/to/ScanNet/Data/ --mode check_scanrefer --dataset scanrefer --conf_idx 1
+python main.py --workspace_path /path/to/Transcribe3D/project/folder/ --scannet_data_root /path/to/ScanNet/Data/ --mode check_scanrefer --dataset_type scanrefer --conf_idx 1
 ```
 
 ## Finetuning
