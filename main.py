@@ -10,7 +10,7 @@ import time
 import numpy as np
 from copy import deepcopy
 from datetime import datetime
-from tenacity import RetryError, before_sleep_log, retry, stop_after_attempt, wait_exponential_jitter  # for exponential backoff
+from tenacity import RetryError, before_sleep_log, retry, stop_after_attempt, wait_exponential_jitter
 
 from core.code_interpreter import CodeInterpreter
 from core.gpt_dialogue import Dialogue
@@ -21,7 +21,7 @@ from utils.utils import *
 from utils.read_data import *
 from utils.analyse_result import *
 
-# logging.basicConfig(stream=sys.stderr, level=logging.ERROR)
+# logger settings
 logger = logging.getLogger(__name__ + 'logger')
 logger.setLevel(logging.ERROR)
 console_handler = logging.StreamHandler()
@@ -183,7 +183,7 @@ class Transcrib3D:
 
         return response
 
-    @retry(wait=wait_exponential_jitter(initial=5, max=30, jitter=5), stop=stop_after_attempt(2), before_sleep=before_sleep_log(logger, logging.ERROR))  # 20s,40s,80s,120s + random.uniform(0,20)
+    @retry(wait=wait_exponential_jitter(initial=5, max=30, jitter=5), stop=stop_after_attempt(2), before_sleep=before_sleep_log(logger, logging.ERROR))  # 5s,10s,20s,30s + random.uniform(0,5)
     def get_gpt_response_no_code_interpreter(self, prompt: str, gpt_dialogue: Dialogue):
         """
         Get response from GPT(without code interpreter). Using retry from tenacity because the openai token limitation might be reached.
@@ -331,7 +331,7 @@ class Transcrib3D:
             npy_path (str): Path of the object information .npy file.
             use_npy_file (bool, optional): To load object list from .npy file or not. Defaults to True.
             object_info_list (list, optional): The object list if .npy file is not used. Defaults to None.
-            void (bool, optional): TODO. Defaults to False.
+            void (bool, optional): Set to True to skip object filtering and return all objects.
 
         Returns:
             list: A list of IDs of the relevant objects.
@@ -371,13 +371,13 @@ class Transcrib3D:
             target_dialogue_path = None
             return all_object_ids, object_filter, target_dialogue_path
 
-        # 新的两步法：先用object filter找到相关物体，在进行refer
-        # 如果给出了object_filter_check_list，则在对应文件夹中检查，如果有则直接使用结果
+        # using object filter
+        # if self.object_filter_result_check_folder_name is provided, try to find previous results and reuse them.
         if self.object_filter_result_check_folder_name is not None:
             target_dialogue_name = "%d_%s_%s_object_filter.json" % (data_index, scan_id, target_id)
-            # 定义dialogue文件夹的路径
-            folder_paths = ["/share/data/ripl/vincenttann/sr3d/%s/%s/%s_dialogue_jsons/" % (self.object_filter_result_check_folder_name, f_time, f_time) for f_time in self.object_filter_result_check_list]
-            # 遍历每个文件夹，检查是否包含目标文件
+            # path of previous dialogue folders
+            folder_paths = [os.path.join(self.object_filter_result_check_folder_name, f_time, "%s_dialogue_jsons"%f_time) for f_time in self.object_filter_result_check_list]
+            # iterate through the folders and look for target dialogue
             found = False
             for folder_path in folder_paths:
                 folder_contents = os.listdir(folder_path)
@@ -390,6 +390,7 @@ class Transcrib3D:
         else:
             found = False
 
+        # target dialogue found, extract relevant ids
         if found:
             target_dialogue_path = folder_path + target_dialogue_name
             with open(target_dialogue_path) as f:
@@ -399,9 +400,10 @@ class Transcrib3D:
             relevant_ids = object_filter.extract_all_int_lists_from_text(last_line)
             relevant_dict = object_filter.extract_dict_from_text(last_line)
 
+        # target dialogue not found, run object filter
         else:
             target_dialogue_path = None
-            if self.gpt_config['model'] == 'gpt-4-1106-preview':  # 如果refer model用4 turbo，那OF也用
+            if self.gpt_config['model'] == 'gpt-4-1106-preview':
                 model = 'gpt-4-1106-preview'
             else:
                 model = 'gpt-4'
@@ -414,7 +416,7 @@ class Transcrib3D:
             for lst in relevant_dict.values():
                 relevant_ids += lst
 
-            # 统计时间和token
+            # statistics
             of_end_time = time.time()
             time_consumed = of_end_time - of_start_time
             self.token_usage_this_ques += token_usage_of
@@ -513,7 +515,7 @@ class Transcrib3D:
             if score is not None:
                 objects_info = self.non_max_suppression(objects_info_f)
 
-        # 统计场景中所有物体的类别，用于scanrefer的unique/multiple分类
+        # aquire unique/multiple information for scanrefer
         # obj_idx_in_scene=[]
         # for obj in objects_info:
         #     obj_idx_in_scene.append(self.raw_label_2_nyu40_idx[obj['label']])
@@ -563,7 +565,7 @@ class Transcrib3D:
             else:
                 prompt = prompt + "Scene center:%s. If no direction vector, observer at center for obj orientation.\n" % remove_spaces(str(scene_center))
 
-        #Iterate through relevant objects and generate quantatitive description.
+        # iterate through relevant objects and generate quantatitive description.
         prompt = prompt + "objs list:\n"
         lines = []
         for obj in objects_related:
@@ -959,19 +961,22 @@ class Transcrib3D:
         return formatted_time
 
     def self_correction(self, failure_diagolue_path, target_id, target_class):
-        # 读入failure dialogue备用
+        """
+        Self-correction of one failure data record.
+        """
+        # read in failure dialogue
         with open(failure_diagolue_path, 'r') as f:
             failure_dialogue = json.load(f)
             failure_dialogue_length = len(failure_dialogue)
             # original_user_dialogue=failure_dialogue[0:2] # system and user
 
-        # 初始化code interpreter
+        # initialize code interpreter
         gpt_config = deepcopy(self.gpt_config)
         gpt_config['load_path'] = failure_diagolue_path
         code_interpreter = CodeInterpreter(**gpt_config)
         code_interpreter.print_pretext()
 
-        # 准备prompt并让gpt自行发现问题，直到其输出Now the answer has complete
+        # prepare prompt and ask LLM to discover false by itself，until LLM reponses "Now the answer has complete"
         print("\nself correcting...\n")
         correction_prompt = "The correct answer is %s %d. Can you double check the information of %s %d and the given prompt and see where you got wrong? Still, add \"Now the answer is complete -- {'ID':id}\" to the end of your answer, where id is the correct id of the referred obj." % (target_class, int(target_id), target_class, int(target_id))
         print("correctin prompt:", correction_prompt)
@@ -980,9 +985,9 @@ class Transcrib3D:
         print("ORIGINAL PROMPT AND CORRECTION DIALOGUE:")
         code_interpreter.print_pretext(print_system_and_user_first_prompt=False)
         print("--------------------------------------------")
-        self_correction_length = len(code_interpreter.pretext) - failure_dialogue_length  # self correction新增的长度
+        self_correction_length = len(code_interpreter.pretext) - failure_dialogue_length  # the length of self correction part
 
-        # 删除gpt之前的错误推理，并让其完整输出推理过程
+        # remove the wrong reasoning in the previous failure dialogue, and ask LLM to generate the entire correct reasoning process.
         print("\nregenerating reasoning process...\n")
         del code_interpreter.pretext[2:failure_dialogue_length]
         regenerate_prompt = "Now you have the correct reasoning and result. Can you generate the whole reasoning process to get this correct answer from the very beginning? Do not mention that you know the correct answer. You cannot use the code execution result above and have to generate code when needed.  When answer step by step, stop whenever you feel there is need to generate python code and wait for the result from the code execution. Remember to use print() function to print out the result and keep two decimal places for numbers."
@@ -993,11 +998,11 @@ class Transcrib3D:
         code_interpreter.print_pretext(print_system_and_user_first_prompt=False)
         print("--------------------------------------------")
 
-        # 提取结果并检查是否为正确答案
+        # extract result from new answer and check whether it is correct
         last_line = response.splitlines()[-1] if len(response) > 0 else ''
         answer_id, _ = self.extract_answer_id_from_last_line(last_line)
         if str(answer_id) == str(target_id):
-            # correction后答案正确，删除correction prompt部分，只保留original prompt和推理过程
+            # if the result is correct after self-correction, delete the correction prompt and keep the original prompt and the reasoning process.
             del code_interpreter.pretext[2:2 + self_correction_length]
             correction_success = True
         else:
@@ -1007,31 +1012,36 @@ class Transcrib3D:
         return code_interpreter, correction_success
 
     def self_correction_dataset(self, result_folder_path, formatted_time, line_number_list):
-        # 首先确定refer数据集
+        """
+        Self correction of a refering dataset
+        """
+        # load dataset
         refer_dataset = load_refer_dataset(self)
 
-        # 定义dialogue文件夹路径
-        # dialogue_folder_path = "%s%s/%s_dialogue_jsons/" % (result_folder_path, formatted_time, formatted_time)
+        # dialogue folder path
         dialogue_folder_path = os.path.join(result_folder_path, formatted_time, "%s_dialogue_jsons"%formatted_time)
 
-        # 遍历指定line_number_list
+        # iterate through line_number_list
         for line_number in line_number_list:
-            # 获取相关数据
+            # data
             data_line = refer_dataset[line_number]
             scan_id = data_line['scene_id'] if self.dataset_type == 'scanrefer' else data_line['scan_id']
             target_id = data_line['object_id'] if self.dataset_type == 'scanrefer' else data_line['target_id']
             target_class = data_line['object_name'] if self.dataset_type == 'scanrefer' else data_line['instance_type']
-            # 定义原始failure dialogue的路径
+            
+            # path of failure dialogue
             dialogue_path = os.path.join(dialogue_folder_path, "%d_%s_%s_refer_failure.json" % (line_number, scan_id, target_id) )
-            # correction dialogue的路径
+            # path of correction dialogue
             correction_dialogue_name = "%d_%s_%s_refer_correction.json" % (line_number, scan_id, target_id)
             # correction_dialogue_path = dialogue_folder_path + correction_dialogue_name
             correction_dialogue_path = os.path.join(dialogue_folder_path, correction_dialogue_name)
-            # 检查correction dialogue是否存在，如果已经存在则跳过
+
+            # check if correction dialogue already exists. if so, skip current case
             if os.path.exists(correction_dialogue_path):
                 print("correction dialogue %s already exists! skipped." % correction_dialogue_path)
                 continue
-            # 如果failure dialogue存在（说明是错误案例），则改正后保存到新文件
+
+            # if failure dialogue exists(which means this is a failure case), run self correction and save correction result.
             if os.path.exists(dialogue_path):
                 print("failure dialogue found: " + dialogue_path)
                 try:
@@ -1049,11 +1059,15 @@ class Transcrib3D:
                     correction_dialogue_name = "%d_%s_%s_refer_correction_fail.json" % (line_number, scan_id, target_id)
                     code_interpreter.save_pretext(dialogue_folder_path, correction_dialogue_name)
                     print("correction fail! saved to: %s%s" % (dialogue_folder_path, correction_dialogue_name))
-            # 如果不存在（说明是正确案例或line_number不正确），则跳过
+            
+            # if not exists(which means this is a success case or the line_number is incorrect), skip.
             else:
                 print("failure dialogue not found! " + dialogue_path)
 
     def log_info(self, line_number, scan_id, utterance, dialogue_object_filter, dialogue_refer, log_file_path, correct_id, answer_id, iou=None, max_iou=None):
+        """
+        Log information of one piece of data record during evaluation.
+        """
         info = "------------------------------------------------------------\n"
         info = info + "LINE NUMBER: \n" + str(line_number) + "\n\n"
         info = info + "SCAN ID: \n" + scan_id + "\n\n"
