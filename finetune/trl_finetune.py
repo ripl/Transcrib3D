@@ -36,9 +36,6 @@ class ScriptArguments:
     """
 
     model_name: Optional[str] = field(default="facebook/opt-350m", metadata={"help": "the model name"})
-    # dataset_name: Optional[str] = field(
-    #     default="timdettmers/openassistant-guanaco", metadata={"help": "the dataset name"}
-    # )
     train_datapath: Optional[str] = field(default="finetune_files/all_refer_success_train.jsonl", metadata={"help": "Path to train data"})
     val_datapath: Optional[str] = field(default="finetune_files/all_refer_success_val.jsonl", metadata={"help": "Path to validation data"})
     dataset_text_field: Optional[str] = field(default="text", metadata={"help": "the text field of the dataset"})
@@ -121,23 +118,12 @@ model.config.pad_token_id = model.config.eos_token_id
 def formatting_conversation(example):
     output_texts = []
     messages = example['messages']
-    # print('message sample: ', messages[0])
-    # print('messages length: ', len(messages))
-    # print('messages type: ', type(messages))
-    # print('example keys: ', list(example.keys())[0:10])
-    # print('example type: ', type(messages))
     for message in messages:
         formatted_conversation = tokenizer.apply_chat_template(message, tokenize=False)
         output_texts.append(formatted_conversation)
     return output_texts
 
 # Step 2: Load the dataset 
-# TODO: load local data
-# dataset = load_dataset(script_args.dataset_name, split="train")
-# train_data_path = "finetune_files/finetune_llm_correct_train.jsonl"
-# val_data_path = "finetune_files/finetune_llm_correct_val.jsonl"
-# train_data_path = "finetune_files/finetune_llm_responses_train.jsonl"
-# val_data_path = "finetune_files/finetune_llm_responses_val.jsonl"
 train_datapath = script_args.train_datapath
 val_datapath = script_args.val_datapath
 dataset = load_dataset("json", data_files={"train": train_datapath, "validation": val_datapath})
@@ -157,8 +143,6 @@ training_args = TrainingArguments(
     push_to_hub=script_args.push_to_hub,
     hub_model_id=script_args.hub_model_id,
     gradient_checkpointing=script_args.gradient_checkpointing,
-    # TODO: uncomment that on the next release
-    # gradient_checkpointing_kwargs=script_args.gradient_checkpointing_kwargs,
 )
 
 # Step 4: Define the LoraConfig
@@ -173,7 +157,6 @@ else:
     peft_config = None
 
 # Step 5: Define the Trainer
-# TODO: add data formatting option
 trainer = SFTTrainer(
     model=model,
     tokenizer=tokenizer,
@@ -182,7 +165,6 @@ trainer = SFTTrainer(
     train_dataset=dataset["train"],
     eval_dataset=dataset["validation"],
     formatting_func=formatting_conversation,
-    # dataset_text_field=script_args.dataset_text_field,
     peft_config=peft_config,
 )
 
