@@ -36,12 +36,66 @@ export OPENAI_API_KEY=xxx
 
 ## Data Prepare
 
-TODO
+Since [ReferIt3D](https://referit3d.github.io/) dataset(includes sr3d and nr3d) and [ScanRefer](https://daveredrum.github.io/ScanRefer/) dataset depend on [ScanNet](http://www.scan-net.org/), we preproces the ScanNet data as the first step.
 
-~~You should have a folder(let's call it *scannet_data_root*) that has ScanNet scene folders such as *scene0000_00* under it.
-Besides the original ScanNet data, object bounding boxes are also needed(ground truth, group free or mask3d). Currently these boxes are directly provided. [Download](https://drive.google.com/drive/folders/1A1nV66J-8NVExauugvlc7X5FM2QhQzeW?usp=drive_link) them and unzip under *scannet_data_root*, so that there will also be these 3 folders under *scannet_data_root*: objects_info, objects_info_gf and objects_info_mask3d_200c.~~
+### quick start
 
-To make things easier, we provide the bounding boexes for each scene at `data/scannet_object_info`. Currently it only include ground truth bounding boxes (which is the setting for NR3D and SR3D from Referit3D benchmark), detected bounding boxes will be provided later. There is no need to prepare the original scannet scene data for the sole purpose of testing (original scene data are still useful for debugging and visualization).
+To make things easier, we provide the bounding boexes for each scene at `data/scannet_object_info`. Currently it only include ground truth bounding boxes (which is the setting for NR3D and SR3D from Referit3D benchmark), detected bounding boxes will be provided later. There is no need to prepare the original scannet scene data for the sole purpose of testing (original scene data are still useful for debugging and visualization). 
+
+*You could jump to **Evaluation** to get quick start.*
+
+If you want to generate the bounding boxes from the original ScanNet data, follow the steps below.
+
+### download ScanNet data
+
+Follow the official instruction [here](https://github.com/ScanNet/ScanNet) to download the data. You have to fill a form and email the authors of ScanNet. Then, you will receive a response email with detailed instructions and a download python script `download-scannet.py`. Run the script to download certain types of data:
+
+```bash
+python download-scannet.py -o [directory in which to download] --type [file suffix]
+```
+
+
+
+Since the original 1.3TB ScanNet data contains many types of data files and there are some types we don't need in this project(such as the RGBD stream `.sens` type), you could use `--type` tag to download only the necessary types:
+
+ `_vh_clean_2.ply _vh_clean_2.labels.ply _vh_clean_2.0.010000.segs.json _vh_clean.segs.json .aggregation.json _vh_clean.aggregation.json .txt`
+
+Run this sh/CMD instruction to download them (to avoid any key-pressing during download, comment the code `key = input('')` at line 147 and 225):
+
+```bash
+# bash
+download_dir="your_download_directory_here"
+suffixes=(
+    "_vh_clean_2.ply"
+    "_vh_clean_2.labels.ply"
+    "_vh_clean_2.0.010000.segs.json"
+    "_vh_clean.segs.json"
+    ".aggregation.json"
+    "_vh_clean.aggregation.json"
+    ".txt"
+)
+for suffix in "${suffixes[@]}"; do
+    python download-scannet.py -o "$download_dir" --type "$suffix"
+done
+```
+
+```cmd
+CMD
+set download_dir="your_download_directory_here"
+set "suffixes=.txt _vh_clean_2.ply _vh_clean_2.labels.ply _vh_clean_2.0.010000.segs.json _vh_clean.segs.json .aggregation.json _vh_clean.aggregation.json "
+
+for %s in (%suffixes%) do (
+  python download-scannet.py -o  %download_dir% --type %s
+)
+```
+
+### generate bounding boxes
+
+
+<!-- ~~You should have a folder(let's call it *scannet_data_root*) that has ScanNet scene folders such as *scene0000_00* under it.
+Besides the original ScanNet data, object bounding boxes are also needed(ground truth, group free or mask3d). Currently these boxes are directly provided. [Download](https://drive.google.com/drive/folders/1A1nV66J-8NVExauugvlc7X5FM2QhQzeW?usp=drive_link) them and unzip under *scannet_data_root*, so that there will also be these 3 folders under *scannet_data_root*: objects_info, objects_info_gf and objects_info_mask3d_200c.~~ -->
+
+
 <!-- 
 ## File Structure
 
