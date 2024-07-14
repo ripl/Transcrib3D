@@ -135,10 +135,13 @@ To use ground truth segmentation data, run:
 python preprocessing/gen_obj_list.py --scannet_download_path [your_scannet_download_directory] --bbox_type gt
 ```
 
-To use Mask3D segmentation data, run:
+To use Mask3D segmentation data, first follow the [Mask3D official guide](https://github.com/JonasSchult/Mask3D) to produce the instance segmentation results, then run:
 
 ```bash
-python preprocessing/gen_obj_list.py --scannet_download_path [your_scannet_download_directory] --bbox_type mask3d
+python preprocessing/gen_obj_list.py --scannet_download_path [your_scannet_download_directory] \
+    --bbox_type mask3d \
+    --mask3d_result_path [your_mask3d_result_directory]
+# Note: mask3d_result_path should look like xxx/Mask3D/eval_output/instance_evaluation_mask3d_export_scannet200_0/val/
 ```
 
 <!-- ~~You should have a folder(let's call it *scannet_data_root*) that has ScanNet scene folders such as *scene0000_00* under it.

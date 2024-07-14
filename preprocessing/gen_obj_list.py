@@ -357,7 +357,7 @@ if __name__=='__main__':
     parser.add_argument("--include_direction", action="store_true", help="Whether to include direction data in the generated object information.")
     parser.add_argument("--referit3d_data_path", type=str, default="None", help="Path of the ReferIt3D data download folder.")
     parser.add_argument("--mask3d_result_path", type=str, default="None", help="Path of the mask result folder. It should look like xxx/Mask3D/eval_output/instance_evaluation_mask3d_export_scannet200_0/val/")
-    parser.add_argument("--mask3d_20_cats", action="store_true", help="If set, will use 20 category for Mask3D. 200 if not set.")
+    parser.add_argument("--mask3d_20_cats", action="store_true", help="If set, will use 20 categories for Mask3D. 200 if not set.")
     args = parser.parse_args()
 
     scannet_download_path = args.scannet_download_path
