@@ -1,6 +1,6 @@
 # Transcrib3D: 3D Referring Expression Resolution through Large Language Models
 
-[[Paper]]() [[Website]](https://ripl.github.io/Transcrib3D/)
+[[Paper]](https://arxiv.org/abs/2404.19221) [[Website]](https://ripl.github.io/Transcrib3D/)
 
 Authors...
 
@@ -105,6 +105,7 @@ your_scannet_download_directory/
 |   |-- scenexxxx_xx/
 |   |   |-- ...
 |-- scans_test/
+|   |-- scene0707_00/
 |   |-- ...
 |-- scannetv2-labels.combined.tsv
 ```
@@ -114,12 +115,27 @@ your_scannet_download_directory/
 Then, use the axis align matrices(recorded in scenexxxx_xx.txt) to transform the coordinates of vertices:
 
 ```bash
-python preprocessing/align_scannet_mesh.py --scannet_download_path your_scannet_download_directory
+python preprocessing/align_scannet_mesh.py --scannet_download_path [your_scannet_download_directory]
 ``` 
 
 
-### generate bounding boxes
+### generate object information
 
+In this step, we process the ScanNet data to acquire quantitative and semantic information of objects in each scene. 
+
+For object instance segmentation, we use either ground truth (ScanNet official) data or off-the-shelf segmentation tool ([Mask3d](https://jonasschult.github.io/Mask3D/)).
+
+To use ground truth segmentation data, run:
+
+```bash
+python preprocessing/gen_obj_list.py --scannet_download_path [your_scannet_download_directory] --bbox_type gt
+```
+
+To use Mask3D segmentation data, run:
+
+```bash
+python preprocessing/gen_obj_list.py --scannet_download_path [your_scannet_download_directory] --bbox_type mask3d
+```
 
 <!-- ~~You should have a folder(let's call it *scannet_data_root*) that has ScanNet scene folders such as *scene0000_00* under it.
 Besides the original ScanNet data, object bounding boxes are also needed(ground truth, group free or mask3d). Currently these boxes are directly provided. [Download](https://drive.google.com/drive/folders/1A1nV66J-8NVExauugvlc7X5FM2QhQzeW?usp=drive_link) them and unzip under *scannet_data_root*, so that there will also be these 3 folders under *scannet_data_root*: objects_info, objects_info_gf and objects_info_mask3d_200c.~~ -->

@@ -61,7 +61,7 @@ def draw_points(points):
     ax.set_zlabel('Z')
     plt.show()
 
-def gen_obj_list(scan_id, scannet_data_root, referit3d_data_root=None, include_direction_info=False):
+def gen_obj_list(scan_id, scannet_data_root, referit3d_data_root=None, include_direction_info=False, is_train_data=True):
     # file paths
     aggregation_json_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean.aggregation.json")
     segs_json_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2.0.010000.segs.json")
@@ -121,23 +121,26 @@ def gen_obj_list(scan_id, scannet_data_root, referit3d_data_root=None, include_d
         vertices_index = np.where(np.in1d(seg_result, seg_index))
 
         # find these vertices in ply file
-        vertices_all = np.array(plydata.elements[0].data)
+        if is_train_data:
+            vertices_all = np.array(plydata_align.elements[0].data) # axis-alined mesh
+        else:
+            vertices_all = np.array(plydata.elements[0].data) # original mesh
         vertices = vertices_all[vertices_index]
         vertices = np.array([list(vertex) for vertex in vertices]) # convert to 2-d numpy array
 
-        # convert to axis aligned coords
-        vertices_coord = vertices[:,0:3]
-        vertices_transpose = np.vstack([vertices_coord.T,np.ones([1,vertices_coord.shape[0]])])
-        vertices_aligned = np.dot(axis_align_matrix,vertices_transpose)[0:3,:]
-        vertices_aligned = vertices_aligned.T
+        # # convert to axis aligned coords
+        # vertices_coord = vertices[:,0:3]
+        # vertices_transpose = np.vstack([vertices_coord.T,np.ones([1,vertices_coord.shape[0]])])
+        # vertices_aligned = np.dot(axis_align_matrix,vertices_transpose)[0:3,:]
+        # vertices_aligned = vertices_aligned.T
 
         # record quantitative information of this object
-        # x_max,x_min,x_avg = np.max(vertices[:,0]),np.min(vertices[:,0]),np.average(vertices[:,0])
-        # y_max,y_min,y_avg = np.max(vertices[:,1]),np.min(vertices[:,1]),np.average(vertices[:,1])
-        # z_max,z_min,z_avg = np.max(vertices[:,2]),np.min(vertices[:,2]),np.average(vertices[:,2])
-        x_max, x_min, x_avg = np.max(vertices_aligned[:,0]), np.min(vertices_aligned[:,0]), np.average(vertices_aligned[:,0])
-        y_max, y_min, y_avg = np.max(vertices_aligned[:,1]), np.min(vertices_aligned[:,1]), np.average(vertices_aligned[:,1])
-        z_max, z_min, z_avg = np.max(vertices_aligned[:,2]), np.min(vertices_aligned[:,2]), np.average(vertices_aligned[:,2])
+        x_max, x_min, x_avg = np.max(vertices[:,0]),np.min(vertices[:,0]),np.average(vertices[:,0])
+        y_max, y_min, y_avg = np.max(vertices[:,1]),np.min(vertices[:,1]),np.average(vertices[:,1])
+        z_max, z_min, z_avg = np.max(vertices[:,2]),np.min(vertices[:,2]),np.average(vertices[:,2])
+        # x_max, x_min, x_avg = np.max(vertices_aligned[:,0]), np.min(vertices_aligned[:,0]), np.average(vertices_aligned[:,0])
+        # y_max, y_min, y_avg = np.max(vertices_aligned[:,1]), np.min(vertices_aligned[:,1]), np.average(vertices_aligned[:,1])
+        # z_max, z_min, z_avg = np.max(vertices_aligned[:,2]), np.min(vertices_aligned[:,2]), np.average(vertices_aligned[:,2])
 
         info["centroid"] = [x_avg, y_avg, z_avg]
         info["center_position"] = [(x_max+x_min)/2, (y_max+y_min)/2, (z_max+z_min)/2]
@@ -748,7 +751,6 @@ if __name__=='__main__':
         # process scannet train set
         scannet_data_root = os.path.join(scannet_download_path, 'scans')
         scan_id_list_train = get_scan_id_list(scannet_data_root)
-        referit3d_data_root = "/share/data/ripl/vincenttann/sr3d/data/"
         save_dir = save_path = os.path.join(scannet_data_root, 'objects_info')
 
         if not os.path.exists(save_dir):
@@ -758,8 +760,29 @@ if __name__=='__main__':
             print("Processing train set: %s (%d/%d)..." % (scan_id,idx+1,len(scan_id_list_train)))
             objects_info = gen_obj_list(scan_id=scan_id, 
                                         scannet_data_root=scannet_data_root,  
-                                        referit3d_data_root=referit3d_data_root,
-                                        include_direction_info=include_direction
+                                        referit3d_data_root=referit3d_data_path,
+                                        include_direction_info=include_direction,
+                                        is_train_data=True
+                                        )
+            save_path = os.path.join(save_dir, f"objects_info_{scan_id}.npy")
+            np.save(save_path, objects_info, allow_pickle=True)
+            print("Object information saved to:", save_path)
+
+        # process scannet test set
+        scannet_data_root = os.path.join(scannet_download_path, 'scans_test')
+        scan_id_list_test = get_scan_id_list(scannet_data_root)
+        save_dir = save_path = os.path.join(scannet_data_root, 'objects_info')
+
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        for idx,scan_id in enumerate(scan_id_list_test):
+            print("Processing test set: %s (%d/%d)..." % (scan_id,idx+1,len(scan_id_list_test)))
+            objects_info = gen_obj_list(scan_id=scan_id, 
+                                        scannet_data_root=scannet_data_root,  
+                                        referit3d_data_root=referit3d_data_path,
+                                        include_direction_info=include_direction,
+                                        is_train_data=False
                                         )
             save_path = os.path.join(save_dir, f"objects_info_{scan_id}.npy")
             np.save(save_path, objects_info, allow_pickle=True)
