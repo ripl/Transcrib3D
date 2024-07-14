@@ -64,7 +64,7 @@ Run this sh/CMD instruction to download them (to avoid any key-pressing during d
 
 ```bash
 # bash
-download_dir="your_download_directory_here"
+download_dir="your_scannet_download_directory"
 suffixes=(
     "_vh_clean_2.ply"
     "_vh_clean_2.labels.ply"
@@ -81,13 +81,42 @@ done
 
 ```cmd
 CMD
-set download_dir="your_download_directory_here"
-set "suffixes=.txt _vh_clean_2.ply _vh_clean_2.labels.ply _vh_clean_2.0.010000.segs.json _vh_clean.segs.json .aggregation.json _vh_clean.aggregation.json "
+set download_dir="your_scannet_download_directory"
+set "suffixes=_vh_clean_2.ply _vh_clean_2.labels.ply _vh_clean_2.0.010000.segs.json _vh_clean.segs.json .aggregation.json _vh_clean.aggregation.json .txt"
 
 for %s in (%suffixes%) do (
   python download-scannet.py -o  %download_dir% --type %s
 )
 ```
+
+After downloading, your folder should look like:
+
+```
+your_scannet_download_directory/
+|-- scans/
+|   |-- scene0000_00/
+|   |   |-- scene0000_00_vh_clean_2.ply
+|   |   |-- scene0000_00_vh_clean_2.labels.ply
+|   |   |-- scene0000_00_vh_clean_2.0.010000.segs.json
+|   |   |-- scene0000_00_vh_clean.segs.json
+|   |   |-- scene0000_00.aggregation.json
+|   |   |-- scene0000_00_vh_clean.aggregation.json
+|   |   |-- scene0000_00.txt
+|   |-- scenexxxx_xx/
+|   |   |-- ...
+|-- scans_test/
+|   |-- ...
+|-- scannetv2-labels.combined.tsv
+```
+
+### axis-align
+
+Then, use the axis align matrices(recorded in scenexxxx_xx.txt) to transform the coordinates of vertices:
+
+```bash
+python preprocessing/align_scannet_mesh.py --scannet_download_path your_scannet_download_directory
+``` 
+
 
 ### generate bounding boxes
 

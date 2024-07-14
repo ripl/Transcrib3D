@@ -1,6 +1,5 @@
 # encoding:utf-8
 import ast
-import csv
 import json
 import logging
 import os
