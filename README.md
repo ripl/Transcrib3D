@@ -54,8 +54,6 @@ Follow the official instruction [here](https://github.com/ScanNet/ScanNet) to do
 python download-scannet.py -o [directory in which to download] --type [file suffix]
 ```
 
-
-
 Since the original 1.3TB ScanNet data contains many types of data files and there are some types we don't need in this project(such as the RGBD stream `.sens` type), you could use `--type` tag to download only the necessary types:
 
  `_vh_clean_2.ply _vh_clean_2.labels.ply _vh_clean_2.0.010000.segs.json _vh_clean.segs.json .aggregation.json _vh_clean.aggregation.json .txt`
@@ -117,6 +115,12 @@ Then, use the axis align matrices(recorded in scenexxxx_xx.txt) to transform the
 ```bash
 python preprocessing/align_scannet_mesh.py --scannet_download_path [your_scannet_download_directory]
 ``` 
+
+### download ReferIt3D and ScanRefer data
+
+Follow the [ReferIt3D official guide](https://referit3d.github.io/#dataset) to download `nr3d.csv`, `sr3d.csv`, `sr3d_train.csv`,  `sr3d_test.csv` and save them at `data/referit3d` folder. 
+
+Follow the [ScanRefer official guide](https://daveredrum.github.io/ScanRefer/) to download the dataset and put them under `data/scanrefer` folder.
 
 
 ### generate object information

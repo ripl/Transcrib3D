@@ -738,7 +738,7 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser(description="Generate object information and save to .npy file.")
     parser.add_argument("--scannet_download_path", type=str, help="Path of the ScanNet data download folder. There should be subfolder 'scans' under it.")
     parser.add_argument("--bbox_type", type=str, choices=['gt', 'mask3d'], default='gt', help="Type of generated bounding boxes. 'gt' means using groud truth segmentation data provided by ScanNet, while 'mask3d' means using Mask3D to segment objects.")
-    parser.add_argument("--include_direction", type=bool, default=False, help="Whether to include direction data in the generated object information.")
+    parser.add_argument("--include_direction", action="store_true", help="Whether to include direction data in the generated object information.")
     parser.add_argument("--referit3d_data_path", type=str, default="None", help="Path of the ReferIt3D data download folder.")
     args = parser.parse_args()
 
