@@ -7,11 +7,11 @@ import os
 from sklearn.cluster import DBSCAN
 from scipy import sparse
 from collections import Counter
+import argparse
 from data.scannet200_constants import VALID_CLASS_IDS_20,CLASS_LABELS_20,VALID_CLASS_IDS_200,CLASS_LABELS_200
 
 
 def read_dict(file_path):
-    # 将json文件读入为字典
     with open(file_path) as fin:
         return json.load(fin)
     
@@ -47,138 +47,131 @@ def load_has_front_meta_data(has_front_file):
 
 def draw_points(points):
     import matplotlib.pyplot as plt
-    # 提取x、y和z坐标
+
     x = points[:, 0]
     y = points[:, 1]
     z = points[:, 2]
 
-    # 创建一个3D散点图
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-
-    # 绘制散点图
     ax.scatter(x, y, z, c='b', marker='o')
 
-    # 设置坐标轴标签
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
-
-    # 显示图形
     plt.show()
 
-def save_points(points):
-    np.save("/share/data/ripl/scannet_raw")
+def gen_obj_list(scan_id, scannet_data_root, referit3d_data_root=None, include_direction_info=False):
+    # file paths
+    aggregation_json_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean.aggregation.json")
+    segs_json_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2.0.010000.segs.json")
+    ply_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2.ply")
+    ply_align_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2.ply")
+    axis_align_matrix_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}.txt")
+    if include_direction_info:
+        object_obb_data_path = os.path.join(referit3d_data_root, 'object_oriented_bboxes_aligned_scans.json')
+        object_has_front_data_path = os.path.join(referit3d_data_root, 'shapenet_has_front.csv')
 
-def gen_obj_list(scan_id, data_root, referit3d_data_root):
-    # 各个文件的路径
-    aggregation_json_path = data_root+scan_id+"/"+scan_id+"_vh_clean.aggregation.json"
-    segs_json_path = data_root+scan_id+"/"+scan_id+"_vh_clean_2.0.010000.segs.json"
-    ply_path = data_root+scan_id+"/"+scan_id+"_vh_clean_2.ply"
-    object_obb_data_path=referit3d_data_root+'object_oriented_bboxes_aligned_scans.json'
-    object_has_front_data_path=referit3d_data_root+'shapenet_has_front.csv'
-
-    # 打开记录vertex语义（所述分割集）的json文件
+    # open the .json file that records vertex semantics (which segmentation set does a vertex belong to)
     print("loading .segs.json file...")
     with open(segs_json_path,'r') as vertex_seg_jfile:
-        seg_result=json.load(vertex_seg_jfile)["segIndices"]
-        seg_result=np.array(seg_result)
+        seg_result = json.load(vertex_seg_jfile)["segIndices"]
+        seg_result = np.array(seg_result)
     
-    # 打开记录object信息的json文件
+    # open the .json file that records object information (which segmentation sets does this object possess.)
     print("loading .aggregation.json file...")
     with open(aggregation_json_path,'r') as vertex_agg_jfile:
-        objects=json.load(vertex_agg_jfile)["segGroups"] #dict的list
+        objects = json.load(vertex_agg_jfile)["segGroups"] # a list of dicts
 
-    # 读入ply文件
+    # read in the .ply mesh file
     print("loading .ply file...")
-    plydata=PlyData.read(ply_path)
+    plydata = PlyData.read(ply_path)
+    plydata_align = PlyData.read(ply_align_path)
 
-    header=plydata.header
-    print("header of .ply file:",header)
+    header = plydata.header
+    print("header of .ply file:\n",header)
 
-    # 读入axis aline矩阵
-    filename = data_root+scan_id+'/'+scan_id+'.txt'  # 替换成实际的文件名
-    with open(filename, 'r') as file:
-        lines=file.readlines()
+    # read in axis aling matrix
+    with open(axis_align_matrix_path, 'r') as file:
+        lines = file.readlines()
         for line in lines:
             if "axisAlignment" in line:
                 numbers = line.split('=')[1].strip().split()
                 break
     axis_align_matrix = np.array(numbers, dtype=float).reshape(4, 4)
 
-    # 读入obb和has_front文件
-    obb_data=load_scan2cad_meta_data(object_obb_data_path)
-    has_front_data=load_has_front_meta_data(object_has_front_data_path)
+    # read in oriented bounding boxes and has_front files
+    if include_direction_info:
+        obb_data = load_scan2cad_meta_data(object_obb_data_path)
+        has_front_data = load_has_front_meta_data(object_has_front_data_path)
 
-    # 定义最终返回的，记录所有object信息的dict
-    objects_info=[]
+    # the list to return 
+    objects_info = []
 
-    # 遍历objects
+    # iterate thru objects
     for obj in objects:
-        # 记录物体基本信息
-        info={"id":obj["id"],
+        # object id and label
+        info = {"id":obj["id"],
               "label":obj["label"]}
         
-        # 获取物体所包含的所有分割集编号
-        seg_index=obj["segments"]
+        # segmentation sets that belong to the object
+        seg_index = obj["segments"]
 
-        # 获取物体所包含的所有vertex的编号
-        vertices_index=np.where(np.in1d(seg_result,seg_index)) #np.in1d函数在seg_result中查找每个vertex的分割集编号是否在seg_indx中
-        # print(vertices_index)
+        # vertices that belong to the object
+        vertices_index = np.where(np.in1d(seg_result, seg_index))
 
-        # 在ply文件中找到物体对应的vertices
-        vertices_all=np.array(plydata.elements[0].data)
-        vertices=vertices_all[vertices_index]
-        vertices=np.array([list(vertex) for vertex in vertices]) #转换为2维numpy array
-        # print(vertices)
-        # print(vertices.shape)
+        # find these vertices in ply file
+        vertices_all = np.array(plydata.elements[0].data)
+        vertices = vertices_all[vertices_index]
+        vertices = np.array([list(vertex) for vertex in vertices]) # convert to 2-d numpy array
 
-        # 转为axis aligned坐标
-        vertices_coord=vertices[:,0:3]
-        vertices_transpose=np.vstack([vertices_coord.T,np.ones([1,vertices_coord.shape[0]])])
-        vertices_aligned=np.dot(axis_align_matrix,vertices_transpose)[0:3,:]
-        vertices_aligned=vertices_aligned.T
+        # convert to axis aligned coords
+        vertices_coord = vertices[:,0:3]
+        vertices_transpose = np.vstack([vertices_coord.T,np.ones([1,vertices_coord.shape[0]])])
+        vertices_aligned = np.dot(axis_align_matrix,vertices_transpose)[0:3,:]
+        vertices_aligned = vertices_aligned.T
 
-        # 计算相关参数并记录定量信息
-        # x_max,x_min,x_avg=np.max(vertices[:,0]),np.min(vertices[:,0]),np.average(vertices[:,0])
-        # y_max,y_min,y_avg=np.max(vertices[:,1]),np.min(vertices[:,1]),np.average(vertices[:,1])
-        # z_max,z_min,z_avg=np.max(vertices[:,2]),np.min(vertices[:,2]),np.average(vertices[:,2])
-        x_max,x_min,x_avg=np.max(vertices_aligned[:,0]),np.min(vertices_aligned[:,0]),np.average(vertices_aligned[:,0])
-        y_max,y_min,y_avg=np.max(vertices_aligned[:,1]),np.min(vertices_aligned[:,1]),np.average(vertices_aligned[:,1])
-        z_max,z_min,z_avg=np.max(vertices_aligned[:,2]),np.min(vertices_aligned[:,2]),np.average(vertices_aligned[:,2])
+        # record quantitative information of this object
+        # x_max,x_min,x_avg = np.max(vertices[:,0]),np.min(vertices[:,0]),np.average(vertices[:,0])
+        # y_max,y_min,y_avg = np.max(vertices[:,1]),np.min(vertices[:,1]),np.average(vertices[:,1])
+        # z_max,z_min,z_avg = np.max(vertices[:,2]),np.min(vertices[:,2]),np.average(vertices[:,2])
+        x_max, x_min, x_avg = np.max(vertices_aligned[:,0]), np.min(vertices_aligned[:,0]), np.average(vertices_aligned[:,0])
+        y_max, y_min, y_avg = np.max(vertices_aligned[:,1]), np.min(vertices_aligned[:,1]), np.average(vertices_aligned[:,1])
+        z_max, z_min, z_avg = np.max(vertices_aligned[:,2]), np.min(vertices_aligned[:,2]), np.average(vertices_aligned[:,2])
 
-        # info["quan_info"]=[x_avg,y_avg,z_avg,(x_max-x_min),(y_max-y_min),(z_max-z_min)]
-        info["centroid"]=[x_avg, y_avg, z_avg]
-        info["center_position"]=[(x_max+x_min)/2, (y_max+y_min)/2, (z_max+z_min)/2]
-        info["size"]=[(x_max-x_min),(y_max-y_min),(z_max-z_min)]
-        info["extension"]=[x_min,y_min,z_min,x_max,y_max,z_max]
-        info["avg_rgba"]=[int(np.average(vertices[:,3])), int(np.average(vertices[:,4])), int(np.average(vertices[:,5])), int(np.average(vertices[:,6]))]
+        info["centroid"] = [x_avg, y_avg, z_avg]
+        info["center_position"] = [(x_max+x_min)/2, (y_max+y_min)/2, (z_max+z_min)/2]
+        info["size"] = [(x_max-x_min), (y_max-y_min), (z_max-z_min)]
+        info["extension"] = [x_min, y_min, z_min, x_max, y_max, z_max]
+        info["avg_rgba"] = [int(np.average(vertices[:,3])), int(np.average(vertices[:,4])), int(np.average(vertices[:,5])), int(np.average(vertices[:,6]))]
 
-        # 读取oriented bbox 和 方向信息
-        key=(scan_id,str(obj['id']))
+        if not include_direction_info:
+            objects_info.append(info)
+            continue
+
+        # read in oriented bounding boxes and has_front information if available
+        key = (scan_id, str(obj['id']))
         # 如果在obb_data中能找到，则记录obb信息和旋转角度信息，并尝试记录front信息
         if key in obb_data:
-            obb_info=obb_data[key]
+            obb_info = obb_data[key]
             
-
             if (obb_info['catid_cad'], obb_info['id_cad']) in has_front_data:
-                info['has_front']=True
-                info['front_point']=obb_info['front_point']
+                info['has_front'] = True
+                info['front_point'] = obb_info['front_point']
             else:
-                info['has_front']=False
-                info['front_point']=obb_info['front_point']
+                info['has_front'] = False
+                info['front_point'] = obb_info['front_point']
 
-            info['obb']=obb_info['obj_bbox']
-            rot_matrix=np.array(obb_info['obj_rot']) 
-            info['rot_angle']=np.arctan2(rot_matrix[1,0],rot_matrix[0,0]) #用x=atan2(sinx,cosx)。
-            # rot 4x4太大了没必要全记录，测试了几个都是front_point算出来的角度+180
+            info['obb'] = obb_info['obj_bbox']
+            rot_matrix = np.array(obb_info['obj_rot']) 
+            info['rot_angle'] = np.arctan2(rot_matrix[1,0],rot_matrix[0,0]) #x = atan2(sinx,cosx)。
 
             # # for test
-            # front_point=np.array(info['front_point'])
-            # center_obb=np.array(info['obb'][0:3])
-            # front_vector=front_point-center_obb
-            # angle_calc=np.arctan2(front_vector[1],front_vector[0])
-            # angle=info['rot_angle']
+            # front_point = np.array(info['front_point'])
+            # center_obb = np.array(info['obb'][0:3])
+            # front_vector = front_point-center_obb
+            # angle_calc = np.arctan2(front_vector[1],front_vector[0])
+            # angle = info['rot_angle']
             # print(key)
             print("%s has front: %s" % (str(key),str(info['has_front'])))
             # print("angle from rot matrix:",angle/np.pi*180)
@@ -186,13 +179,12 @@ def gen_obj_list(scan_id, data_root, referit3d_data_root):
             # print("center from referit3d:",center_obb)
             # print("center from ply:",info['center_position'])
 
-
         else:
-            print("object not found in %s! %s"%(object_obb_data_path,str(key))) 
-            info['has_front']=False
-            info['front_point']=None
-            info['obb']=None
-            info['rot_angle']=None
+            # print("object not found in %s! %s"%(object_obb_data_path,str(key))) 
+            info['has_front'] = False
+            info['front_point'] = None
+            info['obb'] = None
+            info['rot_angle'] = None
 
         objects_info.append(info)
 
@@ -201,23 +193,23 @@ def gen_obj_list(scan_id, data_root, referit3d_data_root):
 def gen_obj_list_group_free(scan_id,scannet_root,group_free_root):
     # 定义路径
     ply_path = scannet_root+scan_id+"/"+scan_id+"_vh_clean_2_aligned.ply"
-    group_free_box_path=group_free_root+scan_id+".npy"
+    group_free_box_path = group_free_root+scan_id+".npy"
     
     # 读入ply文件
     print("loading .ply file...")
-    plydata=PlyData.read(ply_path)
+    plydata = PlyData.read(ply_path)
     print("header:",plydata.header)
 
     # 在ply文件中找到物体对应的vertices
-    vertices=np.array(plydata.elements[0].data)
-    vertices=np.array([list(vertex) for vertex in vertices]) #转换为2维numpy array
-    vertices_coord=vertices[:,0:3]
-    vertices_rgba=vertices[:,3:]
+    vertices = np.array(plydata.elements[0].data)
+    vertices = np.array([list(vertex) for vertex in vertices]) #转换为2维numpy array
+    vertices_coord = vertices[:,0:3]
+    vertices_rgba = vertices[:,3:]
     
     # 读入gf bounding box信息
-    gf_data=np.load(group_free_box_path,allow_pickle=True).reshape(-1)[0]
-    gf_classes=gf_data['class']
-    gf_boxes=gf_data['box']
+    gf_data = np.load(group_free_box_path,allow_pickle=True).reshape(-1)[0]
+    gf_classes = gf_data['class']
+    gf_boxes = gf_data['box']
     assert len(gf_classes)==len(gf_boxes), "len(gf_classes) != len(gf_boxes): %d != %d"%(len(gf_classes),len(gf_boxes))
 
     # 定义最终返回的，记录所有object信息的dict的list
@@ -739,22 +731,50 @@ def get_scan_id_list(data_root):
     return scan_id_list
 
 if __name__=='__main__':
-    # # 处理train set
-    # data_root="/share/data/ripl/scannet_raw/train/"
-    # scan_id_list_train=get_scan_id_list(data_root)
-    # referit3d_data_root="/share/data/ripl/vincenttann/sr3d/data/"
-    # for idx,scan_id in enumerate(scan_id_list_train[1428:]):
-    #     print("Processing train set: %s (%d/%d)..." % (scan_id,idx+1,len(scan_id_list_train)))
-    #     objects_info=gen_obj_list(scan_id=scan_id, data_root=data_root,   referit3d_data_root=referit3d_data_root)
-    #     np.save(data_root+"objects_info/objects_info_"+scan_id+".npy",objects_info,   allow_pickle=True)
+    # parse ScanNet download path
+    parser = argparse.ArgumentParser(description="Generate object information and save to .npy file.")
+    parser.add_argument("--scannet_download_path", type=str, help="Path of the ScanNet data download folder. There should be subfolder 'scans' under it.")
+    parser.add_argument("--bbox_type", type=str, choices=['gt', 'mask3d'], default='gt', help="Type of generated bounding boxes. 'gt' means using groud truth segmentation data provided by ScanNet, while 'mask3d' means using Mask3D to segment objects.")
+    parser.add_argument("--include_direction", type=bool, default=False, help="Whether to include direction data in the generated object information.")
+    parser.add_argument("--referit3d_data_path", type=str, default="None", help="Path of the ReferIt3D data download folder.")
+    args = parser.parse_args()
 
-    # # 处理test set
-    # data_root="/share/data/ripl/scannet_raw/test/"
-    # scan_id_list_test=get_scan_id_list(data_root)
+    scannet_download_path = args.scannet_download_path
+    bbox_type = args.bbox_type
+    include_direction = args.include_direction
+    referit3d_data_path = args.referit3d_data_path
+
+    if bbox_type == "gt":
+        # process scannet train set
+        scannet_data_root = os.path.join(scannet_download_path, 'scans')
+        scan_id_list_train = get_scan_id_list(scannet_data_root)
+        referit3d_data_root = "/share/data/ripl/vincenttann/sr3d/data/"
+        save_dir = save_path = os.path.join(scannet_data_root, 'objects_info')
+
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        for idx,scan_id in enumerate(scan_id_list_train):
+            print("Processing train set: %s (%d/%d)..." % (scan_id,idx+1,len(scan_id_list_train)))
+            objects_info = gen_obj_list(scan_id=scan_id, 
+                                        scannet_data_root=scannet_data_root,  
+                                        referit3d_data_root=referit3d_data_root,
+                                        include_direction_info=include_direction
+                                        )
+            save_path = os.path.join(save_dir, f"objects_info_{scan_id}.npy")
+            np.save(save_path, objects_info, allow_pickle=True)
+            print("Object information saved to:", save_path)
+
+    elif bbox_type == 'mask3d':
+        pass
+
+    # # process scannet test set
+    # scannet_data_root = os.path.join(scannet_download_path, 'scans_test')
+    # scan_id_list_test=get_scan_id_list(scannet_data_root)
     # for idx,scan_id in enumerate(scan_id_list_test):
-    #     print("Processing test set: %s (%d/%d)..." % (scan_id,idx+1,len(scan_id_list_val)))
-    #     objects_info=gen_obj_list(scan_id=scan_id, data_root=data_root,   referit3d_data_root=referit3d_data_root)
-    #     np.save(data_root+"objects_info/objects_info_"+scan_id+".npy",objects_info,   allow_pickle=True)
+    #     print("Processing test set: %s (%d/%d)..." % (scan_id,idx+1,len(scan_id_list_test)))
+    #     save_path = os.path.join(scannet_data_root, 'objects_info', f"objects_info_{scan_id}.npy")
+    #     np.save(save_path, objects_info, allow_pickle=True)
 
     # ####### scanrefer数据，用group free的bbox #########
     # group_free_root="/share/data/ripl/vincenttann/sr3d/data/group_free_pred_bboxes/   group_free_pred_bboxes/"
@@ -838,7 +858,7 @@ if __name__=='__main__':
                            )
         # np.save(scannet_root+"objects_info_mask3d_90/objects_info_mask3d_90_"+scan_id+".npy", objects_info,allow_pickle=True)"""
 
-
+"""
     ## 3d-vista ##
     use_200_cats=bool(1)
     _3dvista_data_root="/share/data/ripl/vincenttann/save_mask/save_mask/"
@@ -883,3 +903,4 @@ if __name__=='__main__':
                            use_200_cats=use_200_cats
                            )
         # np.save(scannet_root+"objects_info_mask3d_90/objects_info_mask3d_90_"+scan_id+".npy", objects_info,allow_pickle=True)
+        """
