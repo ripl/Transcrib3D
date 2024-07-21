@@ -1,18 +1,32 @@
-# Transcrib3D: 3D Referring Expression Resolution through Large Language Models
+<br />
+<p align="center">
+  <h1 align="center">Transcrib3D: 3D Referring Expression Resolution through Large Language Models (IROS 2024) </h1>
+  <p align="center">
+    <a href="https://www.fangjiading.com/)">Jiading Fang*</a>,
+    <a href="https://vincent-tann.github.io/)">Xiangshan Tan*</a>,
+    <a href="https://shengjie-lin.github.io/">Shengjie Lin*</a>,
+    <a href="https://scholar.google.com/citations?user=Sl_2kHcAAAAJ&hl=en">Igor Vasiljevic</a>,
+    <a href="https://scholar.google.com.br/citations?user=ow3r9ogAAAAJ&hl=en">Vitor Guizilini</a>,
+    <a href="https://www.hongyuanmei.com/">Hongyuan Mei</a>,
+    <a href="https://scholar.google.se/citations?user=2xjjS3oAAAAJ&hl=en">Rares Ambrus</a>
+    <a href="https://home.ttic.edu/~gregory/">Gregory Shakhnarovich</a>
+    <a href="https://home.ttic.edu/~mwalter/">Matthew Walter</a>
+  </p>
+  <p align="center">
+    <a href='https://arxiv.org/abs/2404.19221'>
+      <img src='https://img.shields.io/badge/Paper-PDF-red?style=flat&logo=arXiv&logoColor=red' alt='Paper PDF'>
+    </a>
+    <a href='https://ripl.github.io/Transcrib3D/' style='padding-left: 0.5rem;'>
+      <img src='https://img.shields.io/badge/Project-Page-blue?style=flat&logo=Google%20chrome&logoColor=blue' alt='Project Page'>
+    </a>
+  </p>
+</p>
 
-[[Paper]](https://arxiv.org/abs/2404.19221) [[Website]](https://ripl.github.io/Transcrib3D/)
+https://github.com/user-attachments/assets/dbc27b26-a2c5-4aeb-818c-a64506616d04
 
-Authors...
+_Transcrib3D_ reasons and acts according to complex 3D referring expression with real robots.
 
-Abstract...
 
-Demos charts...
-
-## Bibtex
-
-```
-xxx
-```
 
 ## Environment Settings
 
@@ -241,5 +255,17 @@ We provide two example shell scripts to run the finetuning jobs, one with `codel
 - The finetuned open-source models (e.g. codellama, llama2) still large under performs finetuned closed-source model (gpt-3.5-turbo) as of Sep 2023. We expect the situation would change dramatically in the coming future with quickly improving open source models.
 - The resource required for finetuning is roughly 24g+ gpu memory for 7b models and 36g+ gpu memory for 13b models.
 
-
+## Bibtex
+If you find our paper useful, and use it in a publication, we appreciate the following citation:
+```
+@misc{fang2024transcrib3d3dreferringexpression,
+      title={Transcrib3D: 3D Referring Expression Resolution through Large Language Models}, 
+      author={Jiading Fang and Xiangshan Tan and Shengjie Lin and Igor Vasiljevic and Vitor Guizilini and Hongyuan Mei and Rares Ambrus and Gregory Shakhnarovich and Matthew R Walter},
+      year={2024},
+      eprint={2404.19221},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2404.19221}, 
+}
+```
 
