@@ -332,15 +332,9 @@ def gen_obj_list_mask3d(scan_id, scannet_data_root, objects_info_folder_name, ma
     return objects_info
 
 def get_scan_id_list(data_root):
-    # 获取scannet数据集中所有场景的名称
-
-    # 获取文件夹下的所有子文件夹名称
+    # get scan_ids of ScanNet by searching subfolder names
     subfolders = [subfolder for subfolder in os.listdir(data_root) if os.path.isdir(os.path.join(data_root, subfolder))]
-
-    # 打印子文件夹名称
     print("Subfolders:", subfolders)
-
-    print('objects_info' in subfolders)
 
     scan_id_list=[]
     for name in subfolders:

@@ -94,7 +94,7 @@ done
 ```cmd
 CMD
 set download_dir="your_scannet_download_directory"
-set "suffixes=_vh_clean_2.ply _vh_clean_2.labels.ply _vh_clean_2.0.010000.segs.json _vh_clean.segs.json .aggregation.json _vh_clean.aggregation.json .txt"
+set suffixes=_vh_clean_2.ply;_vh_clean_2.labels.ply;_vh_clean_2.0.010000.segs.json;_vh_clean.segs.json;.aggregation.json;_vh_clean.aggregation.json;.txt
 
 for %s in (%suffixes%) do (
   python download-scannet.py -o  %download_dir% --type %s
