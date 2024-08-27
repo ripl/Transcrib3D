@@ -8,16 +8,18 @@ def gen_data_pair(scan_id, scannet_data_root, is_train_data=False, use_high_res_
     ### about low/high res segmentation: https://github.com/ScanNet/ScanNet
     # file paths
     if use_high_res_seg:
+        ply_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean.ply")
         aggregation_json_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean.aggregation.json")
         segs_json_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean.segs.json")
     else:
+        ply_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2.ply")
         aggregation_json_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}.aggregation.json")
         segs_json_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2.0.010000.segs.json")
     print(aggregation_json_path)
     print(segs_json_path)
     # aggregation_json_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}.aggregation.json")
     # segs_json_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2.0.010000.segs.json")
-    ply_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2.ply")
+    # ply_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2.ply")
     ply_align_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2_aligned.ply")
     axis_align_matrix_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}.txt")
 
@@ -95,7 +97,8 @@ if __name__ == "__main__":
     # scannet_data_root = os.path.join('H:\ScanNet_Data\data\scannet\scans', 'scans')
     scannet_data_root = "H:\ScanNet_Data\data\scannet\scans"
     scan_id_list_train = get_scan_id_list(scannet_data_root)
-    save_dir = save_path = os.path.join('data', 'pointcloud_label_data_hi-res')
+    use_high_res_seg = True
+    save_dir = save_path = os.path.join('data', 'pointcloud_label_data_hi-res') if use_high_res_seg else os.path.join('data', 'pointcloud_label_data') 
 
     print(scan_id_list_train)
     
@@ -112,7 +115,7 @@ if __name__ == "__main__":
             os.makedirs(scan_save_dir)
 
         # generate data pair
-        objects_info = gen_data_pair(scan_id, scannet_data_root)
+        objects_info = gen_data_pair(scan_id, scannet_data_root, use_high_res_seg=use_high_res_seg)
 
         # save data
         for obj_info in objects_info:

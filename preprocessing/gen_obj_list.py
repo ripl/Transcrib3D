@@ -50,7 +50,7 @@ def gen_obj_list_gt(scan_id, scannet_data_root, referit3d_data_root=None, includ
     aggregation_json_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean.aggregation.json")
     segs_json_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2.0.010000.segs.json")
     ply_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2.ply")
-    ply_align_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2.ply")
+    ply_align_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2_aligned.ply")
     axis_align_matrix_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}.txt")
     if include_direction_info:
         object_obb_data_path = os.path.join(referit3d_data_root, 'object_oriented_bboxes_aligned_scans.json')
