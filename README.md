@@ -2,8 +2,8 @@
 <p align="center">
   <h1 align="center">Transcrib3D: 3D Referring Expression Resolution through Large Language Models (IROS 2024) </h1>
   <p align="center">
-    <a href="https://www.fangjiading.com/)">Jiading Fang*</a>,
-    <a href="https://vincent-tann.github.io/)">Xiangshan Tan*</a>,
+    <a href="https://www.fangjiading.com/">Jiading Fang*</a>,
+    <a href="https://vincent-tann.github.io/">Xiangshan Tan*</a>,
     <a href="https://shengjie-lin.github.io/">Shengjie Lin*</a>,
     <a href="https://scholar.google.com/citations?user=Sl_2kHcAAAAJ&hl=en">Igor Vasiljevic</a>,
     <a href="https://scholar.google.com.br/citations?user=ow3r9ogAAAAJ&hl=en">Vitor Guizilini</a>,
