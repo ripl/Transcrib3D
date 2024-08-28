@@ -20,8 +20,8 @@ def gen_data_pair(scan_id, scannet_data_root, is_train_data=False, use_high_res_
     # aggregation_json_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}.aggregation.json")
     # segs_json_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2.0.010000.segs.json")
     # ply_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2.ply")
-    ply_align_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2_aligned.ply")
-    axis_align_matrix_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}.txt")
+    # ply_align_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}_vh_clean_2_aligned.ply")
+    # axis_align_matrix_path = os.path.join(scannet_data_root, scan_id, f"{scan_id}.txt")
 
     # open the .json file that records vertex semantics (which segmentation set does a vertex belong to)
     print("loading .segs.json file...")
@@ -37,19 +37,19 @@ def gen_data_pair(scan_id, scannet_data_root, is_train_data=False, use_high_res_
     # read in the .ply mesh file
     print("loading .ply file...")
     plydata = PlyData.read(ply_path)
-    plydata_align = PlyData.read(ply_align_path)
+    # plydata_align = PlyData.read(ply_align_path)
 
     header = plydata.header
     print("header of .ply file:\n",header)
 
-    # read in axis aling matrix
-    with open(axis_align_matrix_path, 'r') as file:
-        lines = file.readlines()
-        for line in lines:
-            if "axisAlignment" in line:
-                numbers = line.split('=')[1].strip().split()
-                break
-    axis_align_matrix = np.array(numbers, dtype=float).reshape(4, 4)
+    # # read in axis aling matrix
+    # with open(axis_align_matrix_path, 'r') as file:
+    #     lines = file.readlines()
+    #     for line in lines:
+    #         if "axisAlignment" in line:
+    #             numbers = line.split('=')[1].strip().split()
+    #             break
+    # axis_align_matrix = np.array(numbers, dtype=float).reshape(4, 4)
 
     # the list to return 
     objects_info = []
@@ -67,10 +67,7 @@ def gen_data_pair(scan_id, scannet_data_root, is_train_data=False, use_high_res_
         vertices_index = np.where(np.in1d(seg_result, seg_index))
 
         # find these vertices in ply file
-        if is_train_data:
-            vertices_all = np.array(plydata_align.elements[0].data) # axis-alined mesh
-        else:
-            vertices_all = np.array(plydata.elements[0].data) # original mesh
+        vertices_all = np.array(plydata.elements[0].data) # original mesh
         vertices = vertices_all[vertices_index]
         vertices = np.array([list(vertex) for vertex in vertices]) # convert to 2-d numpy array
 
