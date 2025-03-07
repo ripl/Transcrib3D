@@ -262,9 +262,9 @@ We provide two example shell scripts to run the finetuning jobs, one with `codel
 After reviewing our experimental logs, we identified a mistake in the description provided in our paper. Below is the correct evaluation protocol:
 
 ### NR3D
-- The best model, **Transcrib3D (GPT-4-P)**, was evaluated on the full NR3D test set.
+- The best model, **Transcrib3D (GPT-4-P)**, was evaluated on the full NR3D test set(`nr3d_test.csv`).
 - Other variants were evaluated using the **first 300 samples** from `nr3d_test_sampled1000.csv`, after **excluding** samples where either `correct_guess` or `mentions_target_class` was `false` (following the original ReferIt3D protocol).  
-  - This results in **281 valid samples** in total.
+  - This results in **281 valid samples** in total, instead of 500 as claimed in the paper.
 
 ### SR3D
 - **GPT-4 variants (GPT-4-NP and GPT-4-P)** were evaluated on the **first 500 samples** from `sr3d_test_sampled1000.csv`.
