@@ -271,9 +271,6 @@ After reviewing our experimental logs, we identified a mistake in the descriptio
 - **GPT-3.5 variants (GPT-3.5-NP and GPT-3.5-P)** were evaluated on the **first 140 samples** from `sr3d_test_sampled1000.csv`.
 
 
-### Notes
-Due to updates in OpenAI's models and randomness in inference, exact reproducibility of the results may not be possible.
-
 ## Bibtex
 If you find our paper useful, and use it in a publication, we would appreciate it if you cite it as:
 ```
