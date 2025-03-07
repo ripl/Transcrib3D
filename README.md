@@ -256,6 +256,24 @@ We provide two example shell scripts to run the finetuning jobs, one with `codel
 - The finetuned open-source models (e.g., codeLlama, Llama2) still under-performs the finetuned closed-source model (gpt-3.5-turbo) as of September 2023. We expect the situation might change dramatically in the coming future with quickly improving open-source models.
 - The resource required for finetuning is roughly 24GB+ GPU memory for 7B models and 36GB+ GPU memory for 13B models.
 
+
+## Clarification on Evaluation Subsets for Table 1 (updated: 3/7/2025)
+
+After reviewing our experimental logs, we identified a mistake in the description provided in our paper. Below is the correct evaluation protocol:
+
+### NR3D
+- The best model, **Transcrib3D (GPT-4-P)**, was evaluated on the full NR3D test set.
+- Other variants were evaluated using the **first 300 samples** from `nr3d_test_sampled1000.csv`, after **excluding** samples where either `correct_guess` or `mentions_target_class` was `false` (following the original ReferIt3D protocol).  
+  - This results in **281 valid samples** in total.
+
+### SR3D
+- **GPT-4 variants (GPT-4-NP and GPT-4-P)** were evaluated on the **first 500 samples** from `sr3d_test_sampled1000.csv`.
+- **GPT-3.5 variants (GPT-3.5-NP and GPT-3.5-P)** were evaluated on the **first 140 samples** from `sr3d_test_sampled1000.csv`.
+
+
+### Notes
+Due to updates in OpenAI's models and randomness in inference, exact reproducibility of the results may not be possible.
+
 ## Bibtex
 If you find our paper useful, and use it in a publication, we would appreciate it if you cite it as:
 ```
