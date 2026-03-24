@@ -63,7 +63,8 @@ class CodeInterpreter(Dialogue):
                 code_exe_msg='code execution result:\n' + str(code_exe_result)
             else:
                 code_exe_msg = "An error was raised when executing the code you write: %s"%code_exe_result
-            print(code_exe_msg)
+            if self.debug:
+                print(code_exe_msg)
             return self.call_llm_with_code_interpreter(code_exe_msg, namespace_for_exec, token_usage_total)
         
 if __name__ == '__main__':

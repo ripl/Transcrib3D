@@ -85,9 +85,9 @@ class ObjectFilter(Dialogue):
             return None
 
     @retry(wait=wait_exponential_jitter(initial=20, max=120, jitter=20), stop=stop_after_attempt(5), before_sleep=before_sleep_log(logger,logging.ERROR)) #20s,40s,80s,120s + random.uniform(0,20)
-    def filter_objects_by_description(self,description,use_npy_file,objects_info_path=None,object_info_list=None,to_print=True):
+    def filter_objects_by_description(self, description,use_npy_file, objects_info_path=None, object_info_list=None, to_print=True):
         # first, create the prompt
-        print("looking for relevant objects based on description:\n'%s'"%description)
+        print("Looking for relevant objects based on description:\n'%s'"%description)
         prompt=""
         prompt=prompt+"description:\n'%s'\nobject list:\n"%description
         # load object info data and add to prompt
@@ -121,10 +121,11 @@ class ObjectFilter(Dialogue):
         # exract answer(list/dict) from the last line of response
         # answer=self.extract_all_int_lists_from_text(last_line)
         answer=self.extract_dict_from_text(last_line)
+        remain_object_num = sum(len(v) for v in answer.values() if isinstance(v, list))
         if to_print:
-            self.print_pretext()
-            print("answer:",answer)
-            print("\n\n")
+            # self.print_pretext() # prin the full dialogue of object filter
+            print(f"\n{remain_object_num} out of {len(data)} objects are remained after filtering.")
+            print("Remaining object IDs and the object classes they are relevant to:",answer)
         if len(answer)==0:
             answer=None
         return answer,token_usage

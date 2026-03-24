@@ -27,23 +27,29 @@ def function_name(param1, param2):
     pass
 
 
+# def round_list(lst:list, length:float):
+#     """
+#     Round every element in a list with certain length.
+
+#     Args:
+#         lst (list): The input list.
+#         length (int): The the number of decimal places retained.
+
+#     Returns:
+#         list: The rounded list
+
+#     Examples:
+#         round_list([1.23, 4.56], 1) returns [1.2, 4.6]
+#     """
+#     for idx, num in enumerate(lst):
+#         lst[idx] = round(num, length)
+#     return list(lst)
+
 def round_list(lst:list, length:float):
     """
     Round every element in a list with certain length.
-
-    Args:
-        lst (list): The input list.
-        length (int): The the number of decimal places retained.
-
-    Returns:
-        list: The rounded list
-
-    Examples:
-        round_list([1.23, 4.56], 1) returns [1.2, 4.6]
     """
-    for idx, num in enumerate(lst):
-        lst[idx] = round(num, length)
-    return list(lst)
+    return np.round(lst, length).tolist()
 
 def remove_spaces(s: str):
     """

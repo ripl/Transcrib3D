@@ -178,7 +178,7 @@ class Transcrib3D:
         self.time_consumed_this_ques += time_consumed
         self.time_consumed_whole_run += time_consumed
 
-        print("\n*** Refer model: token usage=%d, time consumed=%ds, TPM=%.2f ***" % (token_usage_total, time_consumed, token_usage_total / time_consumed * 60))
+        # print("\n*** Refer model: token usage=%d, time consumed=%ds, TPM=%.2f ***" % (token_usage_total, time_consumed, token_usage_total / time_consumed * 60))
 
         return response
 
@@ -401,12 +401,14 @@ class Transcrib3D:
 
         # target dialogue not found, run object filter
         else:
+            print('-'*80)
+            print("\033[1mRunning object filter...\033[0m")
             target_dialogue_path = None
             if self.gpt_config['model'] == 'gpt-4-1106-preview':
                 model = 'gpt-4-1106-preview'
             else:
                 model = 'gpt-4'
-            print("model used in object filter:", model)
+            print("model:", model)
             object_filter = ObjectFilter(model)
             of_start_time = time.time()
             # relevant_ids, token_usage_of = object_filter.filter_objects_by_description(description=utterance, use_npy_file=use_npy_file, objects_info_path=npy_path,object_info_list=object_info_list, to_print=True)
@@ -422,7 +424,7 @@ class Transcrib3D:
             self.token_usage_whole_run += token_usage_of
             self.time_consumed_this_ques += time_consumed
             self.time_consumed_whole_run += time_consumed
-            print("\n*** Object filter: token usage=%d, time consumed=%ds, TPM=%.2f ***\n" % (token_usage_of, time_consumed, token_usage_of / time_consumed * 60))
+            print("\nObject filter: token usage=%d, time consumed=%ds, TPM=%.2f" % (token_usage_of, time_consumed, token_usage_of / time_consumed * 60))
 
         return relevant_ids, relevant_dict, object_filter, target_dialogue_path
 
@@ -457,8 +459,7 @@ class Transcrib3D:
         
         # read in scan_id
         scan_id = data['scene_id'] if self.dataset_type == 'scanrefer' else data['scan_id']
-        if to_print:
-            print("scan_id:", scan_id)
+
 
         # read in refered class and object ids
         target_class = data['object_name'] if self.dataset_type == 'scanrefer' else data["instance_type"]
@@ -468,6 +469,13 @@ class Transcrib3D:
         utterance = data['description'] if self.dataset_type == 'scanrefer' else data["utterance"]
         if not utterance.endswith("."):
             utterance += "."
+
+        # print necessary information
+        if to_print:
+            print("\033[1mscan id:\033[0m", scan_id)
+            print("\033[1mutterance:\033[0m", utterance)
+            print("\033[1mtarget class:\033[0m", target_class)
+            print("\033[1mtarget id:\033[0m", target_id)
 
         # read in reference type, distractors_ids, achor_types and anchor_ids of sr3d
         if self.dataset_type == 'sr3d':
@@ -496,7 +504,7 @@ class Transcrib3D:
         #     print("object_info.npy file does not exist!!! scan_id:",scan_id)
         #     return None, None, None
         npy_path = npy_path_train
-        objects_info = np.load(npy_path, allow_pickle=True)  # objects_info是gt或3d segmentation得到的场景中所有物体的信息
+        objects_info = np.load(npy_path, allow_pickle=True) # objects_info includes information of all objects in the scene, obtained from ground truth or 3d segmentation.
 
         # For scanrefer, filter out the objects in the half space behind the camera.
         if self.dataset_type == 'scanrefer' and self.use_camera_position and self.filter_behind_obj:
@@ -544,7 +552,7 @@ class Transcrib3D:
                     id_to_name_in_description[id] = name
             objects_related = objects_info if (relevant_ids is None) else [obj for obj in objects_info if obj['id'] in relevant_ids]
 
-        # # 对于sr3d记录anchor_has_front
+        # # record has_front for sr3d
         # if self.dataset_type=='sr3d':
         #     anchor_has_front=True
         #     for id in anchor_ids:
@@ -646,11 +654,11 @@ class Transcrib3D:
         prompt = prompt + "\nIf the answer is complete, add \"Now the answer is complete -- {'ID':id}\" to the end of your answer(that is, your completion, not your code), where id is the id of the referred obj. Do not add anything after."
 
         if to_print:
-            print("--------------------------------------------")
-            print("Generated prompt:\n" + prompt)
-            print("--------------------------------------------")
-            print("Right answer:", target_id)
-            print("")
+            print('-'*80)
+            print("\033[1mGenerated prompt:\033[0m\n" + prompt)
+            print('-'*80)
+            # print("\033[1mRight answer:\033[0m", target_id)
+            # print('-'*80)
             
         # some inforation to be returned
         if self.dataset_type == 'sr3d':
@@ -686,8 +694,9 @@ class Transcrib3D:
             matched_dict_str = match.group()
             try:
                 extracted_dict = ast.literal_eval(matched_dict_str)
-                print(extracted_dict)
+                print(f"Extracted answer dictionary: {extracted_dict}")
                 answer_id = extracted_dict['ID']
+                print(f"Answer ID: {answer_id}")
                 if not isinstance(answer_id, int):
                     if isinstance(answer_id, list) and all([isinstance(e, int) for e in answer_id]):
                         print("Wrong answer format: %s. random choice from this list" % str(answer_id))
@@ -735,7 +744,7 @@ class Transcrib3D:
         # record current time for the name of the files.
         current_time = datetime.now()
         formatted_time = current_time.strftime("%Y-%m-%d-%H-%M-%S")
-        print("formatted_time:", formatted_time)
+        print("\033[1mFormatted time:\033[0m", formatted_time)
 
         # create a result folder for the chosen test mode if it does not exist.
         result_folder = os.path.join(self.workspace_path, 'results', self.result_folder_name)
@@ -758,7 +767,9 @@ class Transcrib3D:
         # iterate through the chosen part of dataset
         for idx, line_number in enumerate(line_numbers):
             # print and record the process
-            print("\n\nProcessing %s line %d, %d/%d." % (self.dataset_type, line_number, idx + 1, dataset_len))
+            print("\n")
+            print('-'*80)
+            print("\033[1;34mProcessing %s line %d, %d/%d.\033[0m" % (self.dataset_type, line_number, idx + 1, dataset_len))
 
             with open(process_log_file, 'a') as f:
                 if idx == 0:
@@ -795,7 +806,7 @@ class Transcrib3D:
             self.time_consumed_this_ques = 0
             self.token_usage_this_ques = 0
 
-            # Generate prompt
+            # Generate prompt and get information about this question
             prompt, info, relevant_ids = self.generate_prompt(line_number, to_print=True)
             if prompt is None:
                 with open(process_log_file, 'a') as f:
@@ -816,7 +827,7 @@ class Transcrib3D:
             # read some information from info
             if self.dataset_type == 'sr3d':
                 scan_id, target_id, target_class, distractor_ids, reference_type, utterance, anchor_has_front = info
-                object_filter = ObjectFilter()
+                object_filter = ObjectFilter() # instantiate an ObjectFilter object only for grammar check.
                 prev_of_dialogue_path = None
             elif self.dataset_type == 'nr3d':
                 scan_id, target_id, target_class, utterance, mentions_target_class, uses_object_lang, uses_spatial_lang, uses_color_lang, uses_shape_lang, object_filter, prev_of_dialogue_path = info
@@ -825,6 +836,7 @@ class Transcrib3D:
             object_filter: ObjectFilter
 
             # send the prompt to LLM and try to get response. If an RetryError occurs, randomly set last_line to cause wrong_format==True and trigger random choice.
+            print("\033[1mRunning model reasoning...\033[0m")
             get_gpt_response_success = True
             try:
                 if self.use_code_interpreter:
@@ -834,26 +846,32 @@ class Transcrib3D:
                     gpt_dialogue = Dialogue(**self.gpt_config)
                     response = self.get_gpt_response_no_code_interpreter(prompt, gpt_dialogue)
                     code_interpreter = gpt_dialogue  # must bind an value to code_interpreter
-                print("\n*** This question: token usage=%d, time consumed=%ss, TPM=%.2f ***" % (self.token_usage_this_ques, self.time_consumed_this_ques, self.token_usage_this_ques / self.time_consumed_this_ques * 60))
-                print("*** Whole run: token usage=%d, time consumed=%ss, TPM=%.2f ***\n" % (self.token_usage_whole_run, self.time_consumed_whole_run, self.token_usage_whole_run / self.time_consumed_whole_run * 60))
+                print("Model reasoning completed.")
+                print('-'*80)
+                print("\033[1mToken and time statistics:\033[0m")
+                print("This question: token usage=%d, time consumed=%.2fs, TPM=%.2f" % (self.token_usage_this_ques, self.time_consumed_this_ques, self.token_usage_this_ques / self.time_consumed_this_ques * 60))
+                print("Whole run: token usage=%d, time consumed=%.2fs, TPM=%.2f\n" % (self.token_usage_whole_run, self.time_consumed_whole_run, self.token_usage_whole_run / self.time_consumed_whole_run * 60))
             except RetryError as r:
                 print(r)
                 with open(process_log_file, 'a') as f:
                     f.write("ReTry Error.")
                 response = "Fail to get response from GPT. RetryError in func get_gpt_response"
-                last_line = "Nonesense"
+                last_line = "None"
                 get_gpt_response_success = False
                 code_interpreter = Dialogue(**self.gpt_config)  # must bind an value to code_interpreter
+                print("Model reasoning failed. RetryError in func get_gpt_response.")
+            
 
             # process response from LLM
             if get_gpt_response_success:
-                print("--------------------------------------------")
-                print("DIALOGUE:")
+                print('-'*80)
+                print("\033[1mFull dialogue:\033[0m")
                 code_interpreter.print_pretext()
-                print("--------------------------------------------")
+                print('-'*80)
+                print("\033[1mResults:\033[0m")
                 last_line = response.splitlines()[-1] if len(response) > 0 else ''
-                print(type(last_line))
-                print("last_line:", last_line)
+                # print(type(last_line))
+                print(f"last_line: '{last_line}'")
 
             # extract answer_id from last_line. if the format is wrong, random choose from relevant_ids
             random_choice_list = np.append(distractor_ids, target_id) if self.dataset_type == 'sr3d' else relevant_ids
@@ -898,9 +916,10 @@ class Transcrib3D:
 
             # for sr3d and nr3d, judge correctness by comparing answer_id with target_id
             if self.dataset_type == 'sr3d' or self.dataset_type == 'nr3d':
+                print("Target ID:", target_id)
                 if str(answer_id) == str(target_id):
                     answer_correct = True
-                    print("answer correct.")
+                    print("\033[92manswer correct.\033[0m")
                     results_table[idx][5] = True
                     # log info for correct answer
                     self.log_info(line_number, scan_id, utterance, object_filter.printed_pretext, code_interpreter.printed_pretext, success_log_file, target_id, answer_id)
@@ -913,9 +932,9 @@ class Transcrib3D:
                             f.write("But it's a guess after receiving wrong format.")
                 else:
                     answer_correct = False
-                    print("answer wrong!")
+                    print("\033[91manswer wrong!\033[0m")
                     results_table[idx][5] = str(False)
-                    print("Error info:\nutterance: %s\ntarget_id:%s\nanswer_id:%s\nGPT last response:%s" % (utterance, str(target_id), str(answer_id), response))
+                    # print("Error info:\nutterance: %s\ntarget_id:%s\nanswer_id:%s\nGPT last response:%s" % (utterance, str(target_id), str(answer_id), response))
                     # log info for wrong answer
                     self.log_info(line_number, scan_id, utterance, object_filter.printed_pretext, code_interpreter.printed_pretext, failure_log_file, target_id, answer_id)
                     with open(process_log_file, 'a') as f:
@@ -980,10 +999,10 @@ class Transcrib3D:
         correction_prompt = "The correct answer is %s %d. Can you double check the information of %s %d and the given prompt and see where you got wrong? Still, add \"Now the answer is complete -- {'ID':id}\" to the end of your answer, where id is the correct id of the referred obj." % (target_class, int(target_id), target_class, int(target_id))
         print("correctin prompt:", correction_prompt)
         self.get_gpt_response(correction_prompt, code_interpreter)
-        print("--------------------------------------------")
+        print('-'*80)
         print("ORIGINAL PROMPT AND CORRECTION DIALOGUE:")
         code_interpreter.print_pretext(print_system_and_user_first_prompt=False)
-        print("--------------------------------------------")
+        print('-'*80)
         self_correction_length = len(code_interpreter.pretext) - failure_dialogue_length  # the length of self correction part
 
         # remove the wrong reasoning in the previous failure dialogue, and ask LLM to generate the entire correct reasoning process.
@@ -992,10 +1011,10 @@ class Transcrib3D:
         regenerate_prompt = "Now you have the correct reasoning and result. Can you generate the whole reasoning process to get this correct answer from the very beginning? Do not mention that you know the correct answer. You cannot use the code execution result above and have to generate code when needed.  When answer step by step, stop whenever you feel there is need to generate python code and wait for the result from the code execution. Remember to use print() function to print out the result and keep two decimal places for numbers."
         print("regenerate prompt:", regenerate_prompt)
         response = self.get_gpt_response(regenerate_prompt, code_interpreter)
-        print("--------------------------------------------")
+        print('-'*80)
         print("RE-GENERATED REASONING DIALOGUE:")
         code_interpreter.print_pretext(print_system_and_user_first_prompt=False)
-        print("--------------------------------------------")
+        print('-'*80)
 
         # extract result from new answer and check whether it is correct
         last_line = response.splitlines()[-1] if len(response) > 0 else ''
@@ -1116,7 +1135,12 @@ def main():
     else:
         print("invalid dataset_type!")
 
-    print("test config:\n", eval_config)
+    print('-'*80)
+    print(f"\033[1;33mLaunching Transcrib3D Experiment in [{args.mode}] mode.\033[0m\n")
+
+    print("\033[1mConfigs:\033[0m")
+    for key, value in eval_config.items():
+        print(f"{key}: {value}")
     print("\n")
 
     system_message = 'Imagine you are an artificial intelligence assistant. You job is to do 3D referring reasoning, namely to find the object for a given utterance from a 3d scene presented as object-centric semantic information.\n'
@@ -1136,7 +1160,7 @@ def main():
         'system_message': system_message,
         # 'load_path': '',
         'save_path': 'chats',
-        'debug': True
+        'debug': False
     }
 
     tool = eval_config.get('tool')  # scanrefer detection tool
@@ -1175,7 +1199,7 @@ def main():
         """analyze results"""
         formatted_time = args.ft
         if isinstance(formatted_time, list):
-            print('is list')
+            # print('is list')
             # result_path = ["%s%s/%s.npy" % (result_folder_name, ft, ft) for ft in formatted_time]
             result_path = [os.path.join('results', result_folder_name, ft, f"{ft}.npy") for ft in formatted_time]
         else:

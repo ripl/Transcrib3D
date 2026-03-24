@@ -76,11 +76,11 @@ def analyse_result_sr3d(sr3d_dataset, result_path, use_original_viewdep_judge=Tr
                 result = np.vstack([result, result_single])
     else:
         result = np.load(result_path, allow_pickle=True)
-    print("Sr3d results for:", result_path)
+    # print("Sr3d results for:", result_path)
     # result=result[0:110,:]
     # 定义记录结果的字典
     accuracy_count = {
-        "count_total": 0, "correct_count_total": 0,
+        "count_overall": 0, "correct_count_overall": 0,
         "count_easy": 0, "correct_count_easy": 0,
         "count_hard": 0, "correct_count_hard": 0,
         "count_view_dep": 0, "correct_count_view_dep": 0,
@@ -101,7 +101,7 @@ def analyse_result_sr3d(sr3d_dataset, result_path, use_original_viewdep_judge=Tr
         if result_line[0] == '':
             continue
         # 总数记数
-        accuracy_count["count_total"] += 1
+        accuracy_count["count_overall"] += 1
         # 获取easy信息并给easy的总数记数
         is_easy = get_easy_info('sr3d', sr3d_dataset, line_number)
         easy_setting = 'easy' if is_easy else 'hard'
@@ -118,7 +118,7 @@ def analyse_result_sr3d(sr3d_dataset, result_path, use_original_viewdep_judge=Tr
         accuracy_count["count_" + reference_type] += 1
         # 给正确案例记数
         if result_line[5] == "True":
-            accuracy_count["correct_count_total"] += 1
+            accuracy_count["correct_count_overall"] += 1
             accuracy_count['correct_count_%s' % easy_setting] += 1
             accuracy_count['correct_count_%s' % view_dep_setting] += 1
             accuracy_count['correct_count_left_right'] += 1 if has_left_right else 0
@@ -126,13 +126,20 @@ def analyse_result_sr3d(sr3d_dataset, result_path, use_original_viewdep_judge=Tr
         else:
             wrong_line_numbers.append(eval(result_line[0]))
     # 打印准确率
-    for name in ['total', 'easy', 'hard', 'view_dep', 'view_indep', 'left_right', 'horizontal', 'vertical', 'support', 'between', 'allocentric']:
+    # print overall accuracy with bold font
+    print("\033[1moverall accuracy:\033[0m")
+    correct = accuracy_count["correct_count_overall"]
+    total = accuracy_count["count_overall"]
+    percentage = -1 if total == 0 else correct / total * 100
+    print("\033[1m%.2f%% (%d/%d)\033[0m\n" % (percentage, correct, total))
+    # print accuracies of other subsets
+    for name in ['easy', 'hard', 'view_dep', 'view_indep', 'left_right', 'horizontal', 'vertical', 'support', 'between', 'allocentric']:
         print(name + " accuracy:")
         correct = accuracy_count["correct_count_" + name]
         total = accuracy_count["count_" + name]
         percentage = -1 if total == 0 else correct / total * 100
         print("%.2f%% (%d/%d)" % (percentage, correct, total))
-    print(f' & {round(accuracy_count["correct_count_horizontal"]/accuracy_count["count_horizontal"]*100, 1)} & {round(accuracy_count["correct_count_vertical"]/accuracy_count["count_vertical"]*100, 1)} & {round(accuracy_count["correct_count_support"]/accuracy_count["count_support"]*100, 1)} & {round(accuracy_count["correct_count_between"]/accuracy_count["count_between"]*100, 1)} & {round(accuracy_count["correct_count_allocentric"]/accuracy_count["count_allocentric"]*100, 1)} & {round(accuracy_count["correct_count_total"]/accuracy_count["count_total"]*100, 1)}\\\\')
+    print(f' & {round(accuracy_count["correct_count_horizontal"]/accuracy_count["count_horizontal"]*100, 1)} & {round(accuracy_count["correct_count_vertical"]/accuracy_count["count_vertical"]*100, 1)} & {round(accuracy_count["correct_count_support"]/accuracy_count["count_support"]*100, 1)} & {round(accuracy_count["correct_count_between"]/accuracy_count["count_between"]*100, 1)} & {round(accuracy_count["correct_count_allocentric"]/accuracy_count["count_allocentric"]*100, 1)} & {round(accuracy_count["correct_count_overall"]/accuracy_count["count_overall"]*100, 1)}\\\\')
 
 def analyse_result_nr3d(nr3d_dataset, result_path, skip_human_wrong_cases=True, use_original_viewdep_judge=True):
     # 本函数用于分析nr3d的结果
@@ -146,11 +153,11 @@ def analyse_result_nr3d(nr3d_dataset, result_path, skip_human_wrong_cases=True, 
                 result = np.vstack([result, result_single])
     else:
         result = np.load(result_path, allow_pickle=True)
-    print("Nr3d results for:", result_path)
+    # print("Nr3d results for:", result_path)
     # result=result[0:110,:]
     # 定义记录结果的字典
     accuracy_count = {
-        "count_total": 0, "correct_count_total": 0,
+        "count_overall": 0, "correct_count_overall": 0,
         "count_easy": 0, "correct_count_easy": 0,
         "count_hard": 0, "correct_count_hard": 0,
         "count_view_dep": 0, "correct_count_view_dep": 0,
@@ -174,7 +181,7 @@ def analyse_result_nr3d(nr3d_dataset, result_path, skip_human_wrong_cases=True, 
         if (not get_correct_guess_info('nr3d', nr3d_dataset, line_number)) and skip_human_wrong_cases:
             continue
         # 总数记数
-        accuracy_count["count_total"] += 1
+        accuracy_count["count_overall"] += 1
         # 获取easy信息并给easy的总数记数
         is_easy = get_easy_info('nr3d', nr3d_dataset, line_number)
         easy_setting = 'easy' if is_easy else 'hard'
@@ -199,7 +206,7 @@ def analyse_result_nr3d(nr3d_dataset, result_path, skip_human_wrong_cases=True, 
                 use_lang_settings_used.append(setting)
         # 给正确案例记数
         if result_line[5] == "True":
-            accuracy_count["correct_count_total"] += 1
+            accuracy_count["correct_count_overall"] += 1
             accuracy_count['correct_count_%s' % easy_setting] += 1
             accuracy_count['correct_count_%s' % view_dep_setting] += 1
             accuracy_count['correct_count_left_right'] += 1 if has_left_right else 0
@@ -209,7 +216,14 @@ def analyse_result_nr3d(nr3d_dataset, result_path, skip_human_wrong_cases=True, 
         else:
             wrong_line_numbers.append(eval(result_line[0]))
     # 打印准确率
-    for name in ['total', 'easy', 'hard', 'view_dep', 'view_indep', 'left_right', 'ordinal'] + use_lang_settings:
+    # print overall accuracy with bold font
+    print("\033[1moverall accuracy:\033[0m")
+    correct = accuracy_count["correct_count_overall"]
+    total = accuracy_count["count_overall"]
+    percentage = -1 if total == 0 else correct / total * 100
+    print("\033[1m%.2f%% (%d/%d)\033[0m\n" % (percentage, correct, total))
+    # print accuracies of other subsets
+    for name in ['easy', 'hard', 'view_dep', 'view_indep', 'left_right', 'ordinal'] + use_lang_settings:
         print(name + " accuracy:")
         correct = accuracy_count["correct_count_" + name]
         total = accuracy_count["count_" + name]
@@ -295,10 +309,10 @@ def analyse_result_scanrefer(data_root, result_path, report_none_gt_error=True, 
                 result = np.vstack([result, result_single])
     else:
         result = np.load(result_path, allow_pickle=True)
-    print("Scanrefer results for:", result_path)
+    # print("Scanrefer results for:", result_path)
     # 定义记录结果的字典
     accuracy_count = {
-        "count_total": 0, "correct_count_total_25": 0, "correct_count_total_50": 0,
+        "count_overall": 0, "correct_count_overall_25": 0, "correct_count_overall_50": 0,
         "count_unique": 0, "correct_count_unique_25": 0, "correct_count_unique_50": 0,
         "count_multiple": 0, "correct_count_multiple_25": 0, "correct_count_multiple_50": 0,
     }
@@ -320,20 +334,20 @@ def analyse_result_scanrefer(data_root, result_path, report_none_gt_error=True, 
         # 读入iou
         iou = eval(result_line[7])
         # 总数记数
-        accuracy_count["count_total"] += 1
+        accuracy_count["count_overall"] += 1
         if is_unique:
             accuracy_count["count_unique"] += 1
         else:
             accuracy_count["count_multiple"] += 1
         # iou超过0.25/0.5则给正确数记数
         if iou >= 0.5:
-            accuracy_count["correct_count_total_50"] += 1
+            accuracy_count["correct_count_overall_50"] += 1
             if is_unique:
                 accuracy_count["correct_count_unique_50"] += 1
             else:
                 accuracy_count["correct_count_multiple_50"] += 1
         if iou >= 0.25:
-            accuracy_count["correct_count_total_25"] += 1
+            accuracy_count["correct_count_overall_25"] += 1
             if is_unique:
                 accuracy_count["correct_count_unique_25"] += 1
             else:
@@ -349,7 +363,7 @@ def analyse_result_scanrefer(data_root, result_path, report_none_gt_error=True, 
     # print("wrong cases line_numbers:",wrong_line_numbers)
     # print("wrong cases line_numbers:",wrong_line_numbers_except)
     # 不同setting和k的Acc@k
-    for setting in ['total', 'multiple', 'unique']:
+    for setting in ['overall', 'multiple', 'unique']:
         for thr in [50, 25]:
             correct = accuracy_count["correct_count_%s_%d" % (setting, thr)]
             total = accuracy_count["count_%s" % setting]
@@ -361,8 +375,8 @@ def analyse_result_scanrefer(data_root, result_path, report_none_gt_error=True, 
     print("%.3f" % np.average(iou_list))
     # groupfree没提供正确答案的比例
     if report_none_gt_error and not use_gt_box:
-        total = accuracy_count["count_total"]
-        correct = accuracy_count["correct_count_total_50"]
+        total = accuracy_count["count_overall"]
+        correct = accuracy_count["correct_count_overall_50"]
         wrong = total - correct
         no_correct_answer = total - correct_answer_exist_count
         percentage = "-" if wrong == 0 else no_correct_answer / wrong * 100
@@ -374,6 +388,9 @@ def analyse_result_scanrefer(data_root, result_path, report_none_gt_error=True, 
         print("%.2f%% (%d/%d)" % (percentage, correct, correct_answer_exist_count))
         
 def analyse_result(dataset_type, refer_dataset_path, result_path, config):
+    print('-'*80)
+    print(f"\033[1;34mAnalyzing results on {dataset_type} dataset from result file(s):\033[0m")
+    print(f"{result_path}\n")
     data_root, use_original_viewdep_judge, scanrefer_use_gt_box, scanrefer_iou_thr = config
     refer_dataset = load_refer_dataset_pure(dataset_type, refer_dataset_path)
     if dataset_type == 'sr3d':
