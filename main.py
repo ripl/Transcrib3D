@@ -1168,7 +1168,7 @@ def main():
     ###############################################################################
     if args.mode == 'eval':
         line_number_range = np.arange(args.range[0], args.range[1]) if args.range is not None else args.line_numbers
-        transcrib3d.experiment(line_number_range)  # <---------
+        transcrib3d.evaluation(line_number_range)  # <--------- evaluation entrance
     ###############################################################################
 
     elif args.mode == 'result':
