@@ -407,7 +407,7 @@ class Transcrib3D:
             if self.gpt_config['model'] == 'gpt-4-1106-preview':
                 model = 'gpt-4-1106-preview'
             else:
-                model = 'gpt-4'
+                model = 'gpt-4.1'
             print("model:", model)
             object_filter = ObjectFilter(model)
             of_start_time = time.time()

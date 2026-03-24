@@ -21,9 +21,29 @@ confs_nr3d = {
         'use_priority': False,
         'use_code_interpreter': True
     },
+    1000: {
+        'dataset_type': 'nr3d',
+        'model': 'gpt-4.1',  # 4.1 no principle (added Mar 20, 2026)
+        'result_folder_name': 'eval_results_nr3d_4.1_np_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    1001: {
+        'dataset_type': 'nr3d',
+        'model': 'gpt-4.1',  # 4.1 with principle (added Mar 20, 2026)
+        'result_folder_name': 'eval_results_nr3d_4.1_p_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
     2: {
         'dataset_type': 'nr3d',
-        'model': 'ft:gpt-3.5-turbo-0613:ripl:ref-suc573-cor233:7z8ztnAu',  # 3.5 ft suc573加cor233
+        'model': 'ft:gpt-3.5-turbo-0613:ripl:ref-suc573-cor233:7z8ztnAu',  # 3.5 ft suc573+cor233
         'result_folder_name': 'eval_results_nr3d_35ft_np_sc_testset/',
         'use_principle': False,
         'refer_dataset_path': "./data/referit3d/nr3d_test_sampled1000.csv",
@@ -733,6 +753,26 @@ confs_sr3d = {
         'dataset_type': 'sr3d',
         'model': 'gpt-4-1106-preview',  # 4 with principle
         'result_folder_name': 'eval_results_sr3d_4tb_p_testset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/referit3d/sr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    1000: {
+        'dataset_type': 'sr3d',
+        'model': 'gpt-4.1',  # 4.1 no principle (added Mar 20, 2026)
+        'result_folder_name': 'eval_results_sr3d_4.1_np_testset/',
+        'use_principle': False,
+        'refer_dataset_path': "./data/referit3d/sr3d_test_sampled1000.csv",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
+    1001: {
+        'dataset_type': 'sr3d',
+        'model': 'gpt-4.1',  # 4.1 with principle (added Mar 20, 2026)
+        'result_folder_name': 'eval_results_sr3d_4.1_p_testset/',
         'use_principle': True,
         'refer_dataset_path': "./data/referit3d/sr3d_test_sampled1000.csv",
         'use_gt_box': True,
