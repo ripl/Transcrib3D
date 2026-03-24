@@ -138,7 +138,7 @@ def gen_obj_list_gt(scan_id, scannet_data_root, referit3d_data_root=None, includ
 
         # read in oriented bounding boxes and has_front information if available
         key = (scan_id, str(obj['id']))
-        # 如果在obb_data中能找到，则记录obb信息和旋转角度信息，并尝试记录front信息
+        # If present in obb_data, record OBB and rotation info, and try to record front info
         if key in obb_data:
             obb_info = obb_data[key]
             

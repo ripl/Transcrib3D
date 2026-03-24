@@ -44,7 +44,7 @@ class ObjectFilter(Dialogue):
         super().__init__(**config)
     
     def extract_all_int_lists_from_text(self,text) ->list:
-        # 匹配方括号内的内容
+        # match the content in square brackets
         pattern = r'\[([^\[\]]+)\]'
         matches = re.findall(pattern, text)
 
@@ -139,7 +139,6 @@ if __name__ == "__main__":
         scanrefer_data=json.load(json_file)
     
     from datetime import datetime
-    # 记录时间作为文件名
     current_time = datetime.now()
     formatted_time = current_time.strftime("%Y-%m-%d-%H-%M-%S")
     print("formatted_time:",formatted_time)

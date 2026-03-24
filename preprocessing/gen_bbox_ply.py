@@ -31,7 +31,7 @@ def gen_bbox_ply_scanrefer(scannet_root,gf_root,scan_id,margin=0.01):
              [xmin-margin, ymax+margin, zmax] #15
             ])
 
-    # 将边界框顶点坐标保存为一个 PLY 文件
+    # Save the bounding box vertex coordinates to a PLY file
     # out_file="H:\ScanNet Data\data\scannet\scans\scene0000_00\scene0000_00_bboxes_aligned.ply"
     out_file=scannet_root+scan_id+"/"+scan_id+"_bboxes_aligned.ply"
     with open(out_file, "w") as f:
@@ -59,8 +59,8 @@ def gen_bbox_ply_scanrefer(scannet_root,gf_root,scan_id,margin=0.01):
         f.write("end_header\n")
         f.write("\n")
 
-        # 具体数据
-        # vertex坐标
+        # Vertex data
+        # Vertex coordinates
         for bbox in bounding_boxes:
             # color=(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
             for vertex in bbox:
@@ -71,7 +71,7 @@ def gen_bbox_ply_scanrefer(scannet_root,gf_root,scan_id,margin=0.01):
         for i in range(len(bounding_boxes)):
             # if i>0:
             #     continue
-            # 随机选取颜色，避免出现白色（gt）
+            # Randomly choose a color while avoiding white (gt)
             color=[random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
             min_idx=np.argmin(color)
             if color[min_idx]>220:
@@ -115,7 +115,7 @@ def gen_bbox_ply_scanrefer(scannet_root,gf_root,scan_id,margin=0.01):
     print("Bounding boxes data saved to %s"%out_file)
 
 def gen_bbox_ply_mask3d(scannet_root,scan_id,suffix,margin=0.01,thr=0.2):
-    # 该函数需要已经保存好的object_info
+    # This function requires pre-saved object_info
     # npy_path="/share/data/ripl/scannet_raw/train/objects_info_mask3d/objects_info_mask3d_%s.npy"%scan_id
     # npy_path="%sobjects_info_mask3d/objects_info_mask3d_%s.npy"%(scannet_root,scan_id)
     # npy_path="%sobjects_info_mask3d_35/objects_info_mask3d_35_%s.npy"%(scannet_root,scan_id)
@@ -128,7 +128,7 @@ def gen_bbox_ply_mask3d(scannet_root,scan_id,suffix,margin=0.01,thr=0.2):
     total_count=0
     confident_count=0
 
-    # 遍历boxes，把顶点信息（每个box有8*2=16个顶点）保存到bounding_boxes变量
+    # Iterate over boxes and store vertex data (16 vertices per box) in bounding_boxes
     for idx,obj in enumerate(object_info):
         total_count+=1
         if obj['score']<thr:
@@ -161,7 +161,7 @@ def gen_bbox_ply_mask3d(scannet_root,scan_id,suffix,margin=0.01,thr=0.2):
     print("total:",total_count)
     print("above confidential thr:",confident_count)
 
-    # 将边界框顶点坐标保存为一个 PLY 文件
+    # Save the bounding box vertex coordinates to a PLY file
     # out_file="H:\ScanNet Data\data\scannet\scans\scene0000_00\scene0000_00_bboxes_aligned.ply"
     out_file=scannet_root+scan_id+"/"+scan_id+"_bboxes_aligned_mask3d_%s_%s.ply"%(suffix,str(int(100*thr)))
     with open(out_file, "w") as f:
@@ -189,8 +189,8 @@ def gen_bbox_ply_mask3d(scannet_root,scan_id,suffix,margin=0.01,thr=0.2):
         f.write("end_header\n")
         f.write("\n")
 
-        # 具体数据
-        # vertex坐标
+        # Vertex data
+        # Vertex coordinates
         for bbox in bounding_boxes:
             # color=(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
             for vertex in bbox:
@@ -201,7 +201,7 @@ def gen_bbox_ply_mask3d(scannet_root,scan_id,suffix,margin=0.01,thr=0.2):
         for i in range(len(bounding_boxes)):
             # if i>0:
             #     continue
-            # 随机选取颜色，避免出现白色（gt）
+            # Randomly choose a color while avoiding white (gt)
             color=[random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
             min_idx=np.argmin(color)
             if color[min_idx]>220:
@@ -246,12 +246,12 @@ def gen_bbox_ply_mask3d(scannet_root,scan_id,suffix,margin=0.01,thr=0.2):
 
 
 def get_scan_id_list(data_root):
-    # 获取scannet数据集中所有场景的名称
+    # Get the names of all scenes in the ScanNet dataset
 
-    # 获取文件夹下的所有子文件夹名称
+    # Get the names of all subfolders in the directory
     subfolders = [subfolder for subfolder in os.listdir(data_root) if os.path.isdir(os.path.join(data_root, subfolder))]
 
-    # 打印子文件夹名称
+    # Print the subfolder names
     print("Subfolders:", subfolders)
 
     print('objects_info' in subfolders)

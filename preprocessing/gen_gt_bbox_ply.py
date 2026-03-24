@@ -37,7 +37,7 @@ def gen_gt_bbox_ply(scannet_root,scanrefer_gt_root,scan_id,margin=0.01):
             ])
         # print(box)
 
-    # 将边界框顶点坐标保存为一个 PLY 文件
+    # Save the bounding box vertex coordinates to a PLY file
     # out_file="H:\ScanNet Data\data\scannet\scans\scene0000_00\scene0000_00_bboxes_aligned.ply"
     out_file=scannet_root+scan_id+"/"+scan_id+"_gt_bboxes_aligned.ply"
     with open(out_file, "w") as f:
@@ -57,15 +57,15 @@ def gen_gt_bbox_ply(scannet_root,scanrefer_gt_root,scan_id,margin=0.01):
         f.write("end_header\n")
         f.write("\n")
 
-        # 具体数据
-        # vertex坐标
+        # Geometry data
+        # Vertex coordinates
         for bbox in bounding_boxes:
             # color=(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
             for vertex in bbox:
                 # f.write(f"{vertex[0]} {vertex[1]} {vertex[2]} {color[0]} {color[1]} {color[2]}\n")
                 f.write(f"{vertex[0]} {vertex[1]} {vertex[2]}\n")
         f.write("\n")
-        # face
+        # Faces
         for i in range(len(bounding_boxes)):
             # color=(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
             color=[255,255,255]
@@ -109,12 +109,12 @@ def gen_gt_bbox_ply(scannet_root,scanrefer_gt_root,scan_id,margin=0.01):
     print("Bounding boxes data saved to %s"%out_file)
 
 def get_scan_id_list(data_root):
-    # 获取scannet数据集中所有场景的名称
+    # Get the names of all scenes in the ScanNet dataset
 
-    # 获取文件夹下的所有子文件夹名称
+    # Get the names of all subfolders in the directory
     subfolders = [subfolder for subfolder in os.listdir(data_root) if os.path.isdir(os.path.join(data_root, subfolder))]
 
-    # 打印子文件夹名称
+    # Print the subfolder names
     print("Subfolders:", subfolders)
 
     print('objects_info' in subfolders)
@@ -126,13 +126,12 @@ def get_scan_id_list(data_root):
     print("%d scan ids found." %len(scan_id_list))
     return scan_id_list
 
+if __name__ == "__main__":
+    scanrefer_gt_root="H:/CodeUndergrad/Refer3dProject/ScanRefer/data/scannet/scannet_data/"
+    gf_root="H:/CodeUndergrad/Refer3dProject/Sr3d/data/group_free_pred_bboxes/group_free_pred_bboxes/"
+    scannet_root="H:/ScanNet Data/data/scannet/scans/"
 
-scanrefer_gt_root="H:/CodeUndergrad/Refer3dProject/ScanRefer/data/scannet/scannet_data/"
-gf_root="H:/CodeUndergrad/Refer3dProject/Sr3d/data/group_free_pred_bboxes/group_free_pred_bboxes/"
-scannet_root="H:/ScanNet Data/data/scannet/scans/"
-
-data_list=get_scan_id_list(scannet_root)
-# data_list=["scene0000_00",]
-for scan_id in data_list:
-    gen_gt_bbox_ply(scannet_root,scanrefer_gt_root,scan_id,margin=0.02)
-
+    data_list=get_scan_id_list(scannet_root)
+    # data_list=["scene0000_00",]
+    for scan_id in data_list:
+        gen_gt_bbox_ply(scannet_root,scanrefer_gt_root,scan_id,margin=0.02)
