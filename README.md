@@ -20,7 +20,7 @@
       <img src='https://img.shields.io/badge/Project-Page-blue?style=flat&logo=Google%20chrome&logoColor=blue' alt='Project Page'>
     </a>
     <a href='https://huggingface.co/spaces/Transcrib3D/Transcrib3D-Demo' style='padding-left: 0.5rem;'>
-      <img src='https://img.shields.io/badge/Hugging%20Face-Demo-yellow?style=flat&logo=huggingface&logoColor=black' alt='Hugging Face Demo'>
+      <img src='https://img.shields.io/badge/Hugging%20Face-Demo-yellow?style=flat&logo=huggingface&logoColor=yellow' alt='Hugging Face Demo'>
     </a>
   </p>
 </p>
