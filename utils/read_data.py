@@ -88,7 +88,7 @@ def get_axis_align_matrix(txt_path):
     axis_align_matrix = np.array(numbers, dtype=float).reshape(4, 4)
     return axis_align_matrix
 
-def get_scanrefer_gt_box(scan_id, object_id):
+def get_scanrefer_gt_box(scan_id, object_id, scannet_aligned_bbox_root):
     """
     Convert a bounding box in center-size format to extension format.
 
@@ -104,7 +104,8 @@ def get_scanrefer_gt_box(scan_id, object_id):
     # get the ground truth bounding box according to scan_id and object id
     # from file scan_id_aligned_bbox.npy, which could be produced in pre-process of ScanRefer repo.
     # scan_id_aligned_bbox.npy has matrices of shape (N, 8)，with each row as a box. box format is (cx,cy,cz,sx,sy,sz,label_id,obj_id).
-    gt_box_path = "/share/data/ripl/vincenttann/ScanRefer/data/scannet/scannet_data/" + scan_id + "_aligned_bbox.npy"
+    # gt_box_path = "/share/data/ripl/vincenttann/ScanRefer/data/scannet/scannet_data/" + scan_id + "_aligned_bbox.npy"
+    gt_box_path = os.path.join(scannet_aligned_bbox_root, scan_id + "_aligned_bbox.npy")
     gt_boxes = np.load(gt_box_path)
     gt_box = gt_boxes[gt_boxes[:, -1].reshape(-1).astype(int) == int(object_id)]
     assert len(gt_box) > 0, "No gt box found!!! scan_id=%d, object_id=%d" % (scan_id, object_id)

@@ -31,13 +31,14 @@ logger.addHandler(console_handler)
 
 
 class Transcrib3D:
-    def __init__(self, workspace_path, scannet_data_root, dataset_type, refer_dataset_path, result_folder_name, gpt_config, scanrefer_iou_thr=0.5, use_gt_box=True, object_filter_result_check_folder_name=None, object_filter_result_check_list=None, use_principle=True, use_original_viewdep_judge=True, use_object_filter=True, scanrefer_tool_name='mask3d', use_priority=False, use_code_interpreter=True, use_camera_position=True, filter_behind_obj=True, obj_info_ablation_type=0) -> None:
+    def __init__(self, workspace_path, scannet_data_root, scanrefer_scannet_aligned_bbox_root, dataset_type, refer_dataset_path, result_folder_name, gpt_config, scanrefer_iou_thr=0.5, use_gt_box=True, object_filter_result_check_folder_name=None, object_filter_result_check_list=None, use_principle=True, use_original_viewdep_judge=True, use_object_filter=True, scanrefer_tool_name='mask3d', use_priority=False, use_code_interpreter=True, use_camera_position=True, filter_behind_obj=True, obj_info_ablation_type=0) -> None:
         """
         Class initialization.
 
         Args:
             workspace_path (str): Path of Transcrib3D project folder.
             scannet_data_root (str): Path to the ScanNet data folder.
+            scanrefer_scannet_aligned_bbox_root (str): Path to the ScanNet aligned bounding box data folder, obtained from pre-processing of ScanRefer repo.
             dataset_type (str): Type of refering dataset. One of [sr3d, nr3d, scanrefer].
             refer_dataset_path (str): Path to the refering dataset file (.csv or .json).
             result_folder_name (str): The name of result folder of a certain experiment setting. It will be under the 'results' folder.
@@ -61,6 +62,7 @@ class Transcrib3D:
         """
         self.workspace_path = workspace_path
         self.scannet_data_root = scannet_data_root
+        self.scanrefer_scannet_aligned_bbox_root = scanrefer_scannet_aligned_bbox_root
         self.dataset_type = dataset_type
         self.refer_dataset_path = refer_dataset_path
         self.result_folder_name = result_folder_name
@@ -261,7 +263,7 @@ class Transcrib3D:
         #     print("object_info.npy file does not exist!!! scan_id:",scan_id)
         npy_path = npy_path_train
         objects_info = np.load(npy_path, allow_pickle=True)
-        gt_box = self.get_scanrefer_gt_box(scan_id, target_id)
+        gt_box = get_scanrefer_gt_box(scan_id, target_id, scannet_aligned_bbox_root=self.scanrefer_scannet_aligned_bbox_root)
         iou_max = 0.0
         iou_max_object = None
         for obj in objects_info:
@@ -296,7 +298,8 @@ class Transcrib3D:
             data = self.scanrefer_data[idx]
             answer_exist_count += exist
             # unique or multiple. being unique means target the object is the only one of its class in the scene.
-            is_unique = get_unique_info(data['scene_id'], data['object_name'])
+            data_root = os.path.join(self.scannet_data_root, '..')
+            is_unique = get_unique_info(data_root,data['scene_id'], data['object_name'])
             if is_unique:
                 total_unique += 1
                 answer_exist_count_unique += exist
@@ -667,7 +670,7 @@ class Transcrib3D:
         elif self.dataset_type == 'nr3d':
             info = (scan_id, target_id, target_class, utterance, mentions_target_class, uses_object_lang, uses_spatial_lang, uses_color_lang, uses_shape_lang, object_filter, target_dialogue_path)
         else:
-            gt_box = get_scanrefer_gt_box(scan_id, target_id)
+            gt_box = get_scanrefer_gt_box(scan_id, target_id, scannet_aligned_bbox_root=self.scanrefer_scannet_aligned_bbox_root)
             info = (scan_id, target_id, target_class, utterance, annotation_id, objects_related, gt_box, object_filter, target_dialogue_path, is_unique)
 
         return prompt, info, relevant_ids
@@ -945,14 +948,14 @@ class Transcrib3D:
                 target_id_text = str(target_id) + "(ScanNet) / " + str(iou_max_object['id']) + "(%s)" % self.scanrefer_tool_name
                 if iou > self.scanrefer_iou_thr:
                     answer_correct = True
-                    print("answer correct: IoU=%.3f" % iou)
+                    print("\033[92manswer correct: IoU=%.3f\033[0m" % iou)
                     # log info for correct answer
                     self.log_info(line_number, scan_id, utterance, object_filter.printed_pretext, code_interpreter.printed_pretext, success_log_file, target_id_text, answer_id, iou, iou_max)
                     with open(process_log_file, 'a') as f:
                         f.write("answer correct. iou=%.3f" % iou)
                 else:
                     answer_correct = False
-                    print("answer wrong! IoU=%.3f" % iou)
+                    print("\033[91manswer wrong! IoU=%.3f\033[0m" % iou)
                     # log info for wrong answer
                     self.log_info(line_number, scan_id, utterance, object_filter.printed_pretext, code_interpreter.printed_pretext, failure_log_file, target_id_text, answer_id, iou, iou_max)
                     with open(process_log_file, 'a') as f:
@@ -1105,22 +1108,84 @@ class Transcrib3D:
 def parse_args():
     import argparse
     parser = argparse.ArgumentParser(description="Transcrib3D")
+    default_workspace_path = os.path.dirname(os.path.abspath(__file__))
+    default_scannet_data_root = os.path.join(default_workspace_path, "data", "scannet_object_info")
+    default_scanrefer_scannet_aligned_bbox_root = os.path.join(default_workspace_path, "data", "scanrefer", "scannet", "scannet_data")
 
-    parser.add_argument("--scannet_data_root", type=str, help="Path of folder that contains scannet scene folders such as 'scene0000_00'.")
-    parser.add_argument("--workspace_path", type=str, help="Path of the Transcribe3D project folder.")
+    parser.add_argument("--workspace_path", type=str, default=default_workspace_path, help="Path of the Transcribe3D project folder. Defaults to the directory containing main.py.")
+    parser.add_argument("--scannet_data_root", type=str, default=default_scannet_data_root, help="Path of ScanNet object data folder. Defaults to the './data/scannet_object_info' folder in the workspace path.")
+    parser.add_argument("--scanrefer_scannet_aligned_bbox_root", type=str, default=default_scanrefer_scannet_aligned_bbox_root, help="Path of ScanNet aligned bounding box data folder, obtained from pre-processing of ScanRefer repo. Defaults to the './data/scanrefer/scannet/scannet_data' folder in the workspace path.")
     parser.add_argument("--mode", type=str, choices=["eval", "result", "self_correct", "check_scanrefer"], help="Mode of operation     (eval or result)")
     parser.add_argument("--dataset_type", type=str, choices=["nr3d", "sr3d", "scanrefer"], help="Choose the refering dataset.")
     parser.add_argument("--conf_idx", type=int, help="Configuration index in file config.py.")
     parser.add_argument("--range", type=int, nargs='*', help="Range of line numbers of the refering dataset(will be fed to np.arange()). For nr3d and sr3d, the minimum is 2. For scanrefer, the minimum is 0.")
     parser.add_argument("--line_numbers", type=int, nargs='*', help="When the 'range' parameter is not provided, you can specify non-contiguous line numbers here.")
+    parser.add_argument("--eval_all", action="store_true", help="Evaluate all data points in the dataset file specified by the selected config. Overrides --range and --line_numbers.")
     parser.add_argument("--ft", type=str, nargs='*', help="List of times in 'yy-mm-dd-HH-MM-SS' format. Requested for result mode.")
     parser.add_argument("--obj-info-ablation-type", type=int, default=0, help="Type of ablation for sr3d. 0: no ablation; 1: no size; 2: min+max; 3: attributes reversed; 4: objects shuffled.")
     parser.add_argument("--use_camera_position", type=bool, default=True)
     parser.add_argument("--filter_behind_obj", type=bool, default=True)
 
     args = parser.parse_args()
+    args.workspace_path = os.path.abspath(args.workspace_path)
 
     return args
+
+
+def get_all_line_numbers_for_eval(dataset_type: str, refer_dataset_path: str, workspace_path: str):
+    """
+    Build the full list of dataset indices for evaluation.
+
+    Args:
+        dataset_type (str): One of [nr3d, sr3d, scanrefer].
+        refer_dataset_path (str): Dataset file path from config.
+        workspace_path (str): Workspace root used to resolve relative dataset paths.
+
+    Returns:
+        tuple: (line_numbers, dataset_path, dataset_size)
+    """
+    dataset_path = refer_dataset_path if os.path.isabs(refer_dataset_path) else os.path.abspath(os.path.join(workspace_path, refer_dataset_path))
+
+    if dataset_type in ['nr3d', 'sr3d']:
+        dataset_size = len(read_csv_with_index(dataset_path))
+        line_numbers = np.arange(2, dataset_size + 2)
+    elif dataset_type == 'scanrefer':
+        dataset_size = len(read_json(dataset_path))
+        line_numbers = np.arange(0, dataset_size)
+    else:
+        raise ValueError("Invalid dataset type: %s" % dataset_type)
+
+    return line_numbers, dataset_path, dataset_size
+
+
+def confirm_eval_all(dataset_type: str, refer_dataset_path: str, workspace_path: str):
+    """
+    Ask the user to confirm before evaluating the entire dataset.
+
+    Args:
+        dataset_type (str): One of [nr3d, sr3d, scanrefer].
+        refer_dataset_path (str): Dataset file path from config.
+        workspace_path (str): Workspace root used to resolve relative dataset paths.
+
+    Returns:
+        np.ndarray | None: Full evaluation indices if confirmed, otherwise None.
+    """
+    line_numbers, dataset_path, dataset_size = get_all_line_numbers_for_eval(
+        dataset_type=dataset_type,
+        refer_dataset_path=refer_dataset_path,
+        workspace_path=workspace_path
+    )
+
+    confirm_message = (
+        f"\033[1;33mThis will evaluate all {dataset_size} data points in {dataset_path}. "
+        "This may consume a large number of API tokens. Continue? Enter y/yes to proceed: \033[0m"
+    )
+    user_input = input(confirm_message).strip().lower()
+    if user_input not in ['y', 'yes']:
+        print("\033[1;33mEvaluation cancelled by user.\033[0m")
+        return None
+
+    return line_numbers
 
 
 def main():
@@ -1172,6 +1237,7 @@ def main():
 
     transcrib3d = Transcrib3D(scannet_data_root=args.scannet_data_root,
                       workspace_path=args.workspace_path,
+                      scanrefer_scannet_aligned_bbox_root=args.scanrefer_scannet_aligned_bbox_root,
                       dataset_type=eval_config['dataset_type'],
                       refer_dataset_path=eval_config['refer_dataset_path'],
                       result_folder_name=result_folder_name,
@@ -1191,7 +1257,16 @@ def main():
 
     ###############################################################################
     if args.mode == 'eval':
-        line_number_range = np.arange(args.range[0], args.range[1]) if args.range is not None else args.line_numbers
+        if args.eval_all:
+            line_number_range = confirm_eval_all(
+                dataset_type=eval_config['dataset_type'],
+                refer_dataset_path=eval_config['refer_dataset_path'],
+                workspace_path=args.workspace_path
+            )
+            if line_number_range is None:
+                return
+        else:
+            line_number_range = np.arange(args.range[0], args.range[1]) if args.range is not None else args.line_numbers
         transcrib3d.evaluation(line_number_range)  # <--------- evaluation entrance
     ###############################################################################
 

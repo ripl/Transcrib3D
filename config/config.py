@@ -990,6 +990,16 @@ confs_scanrefer = {
         'use_priority': False,
         'use_code_interpreter': True
     },
+    1000: {
+        'dataset_type': 'scanrefer',
+        'model': 'gpt-4.1',  # 4.1 with gt box on val set
+        'result_folder_name': 'eval_results_scanrefer_4.1_p_gtbox_valset/',
+        'use_principle': True,
+        'refer_dataset_path': "./data/scanrefer/ScanRefer_filtered_val_sampled1000.json",
+        'use_gt_box': True,
+        'use_priority': False,
+        'use_code_interpreter': True
+    },
     1: {
         'dataset_type': 'scanrefer',
         'model': 'gpt-4',  # 4 with gt box on train set

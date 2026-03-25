@@ -1,1 +1,0 @@
-python main.py --workspace_path . --scannet_data_root ./data/scannet_object_info  --mode eval --dataset nr3d --conf_idx 1 --range 5 7
