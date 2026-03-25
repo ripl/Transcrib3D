@@ -231,9 +231,9 @@ Please note that, gpt-4 is the model that we use to get the results reported in 
 
 - To select the evaluation range of the dataset, modify the `--range` setting. For Sr3D and Nr3D, which use .csv files, the minimum number is 2. For ScanRefer, which uses .json files, the minimum number is 0. Use `--eval_all` to evaluate all data records in the `.csv` or `.json` file.
 
-- For convenience, more configurations are placed in `config/config.py`. There are 3 dictionaries inside: confs_nr3d, confs_sr3d and confs_scanrefer. Each of them contains several configurations of that dataset. The meaning of different configurations can be understood from the variable names. Modify the `--conf_idx` setting to select a configuration. You can also add your own configurations.
+- For convenience, more configurations are placed in `config/config.py`. There are 3 dictionaries inside: `confs_nr3d`, `confs_sr3d` and `confs_scanrefer`. Each of them contains several configurations of that dataset. The meaning of different configurations can be understood from the variable names. Modify the `--conf_idx` setting to select a configuration. You can also add your own configurations.
 
-- Use `--workspath_path`, `scannet_data_root`, and `--scanrefer_scannet_aligned_bbox_root` to overwrite the default values. More information can be found by running `python main.py -h`.
+- Use `--workspace_path`, `--scannet_data_root`, and `--scanrefer_scannet_aligned_bbox_root` to overwrite the default values. More information can be found by running `python main.py -h`.
 
 ### Result Storage
 
