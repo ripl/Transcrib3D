@@ -28,7 +28,7 @@ _Transcrib3D_ reasons about and acts according to complex 3D referring expressio
 
 
 
-## Environment Settings
+## 0. Environment Settings
 
 For evaluation, a small number of packages are required, include *numpy*, *openai* and *tenacity*.
 
@@ -48,15 +48,17 @@ Set up your OpenAI API key as an environment variable `OPENAI_API_KEY`:
 export OPENAI_API_KEY=xxx
 ```
 
-## Data Preparation
+If you don't have an API key, generate one [here](https://platform.openai.com/api-keys). 
 
-Since the [ReferIt3D](https://referit3d.github.io/) dataset, which includes sr3d and nr3d, and the [ScanRefer](https://daveredrum.github.io/ScanRefer/) dataset depend on [ScanNet](http://www.scan-net.org/), we first preproces the ScanNet data.
+## 1. Data Preparation
+
+Since the [ReferIt3D](https://referit3d.github.io/) dataset and the [ScanRefer](https://daveredrum.github.io/ScanRefer/) dataset both depend on [ScanNet](http://www.scan-net.org/), we first preproces the ScanNet data.
 
 ### Quick Start
 
-To make things easier, we provide the bounding boxes for each scene at `data/scannet_object_info`. Currently, it only includes ground-truth bounding boxes (which is the setting for NR3D and SR3D from the Referit3D benchmark). Detected bounding boxes will be provided later. There is no need to prepare the original ScanNet scene data for the sole purpose of testing (original scene data are still useful for debugging and visualization). 
+For ease of use, we provide the object bounding boxes for each ScanNet scene at `data/scannet_object_info`. Currently, it only includes ground-truth bounding boxes (which is the setting for NR3D and SR3D from the Referit3D benchmark). Detected bounding boxes will be provided later. There is no need to prepare the original ScanNet scene data for the sole purpose of testing (original scene data are still useful for debugging and visualization). 
 
-*You could jump to **Evaluation** to get a quick start.*
+*You could jump to [**Evaluation**](#2-evaluation) to get a quick start.*
 
 If you want to generate the bounding boxes from the original ScanNet data, follow the steps below.
 
@@ -135,6 +137,7 @@ python preprocessing/align_scannet_mesh.py --scannet_download_path [your_scannet
 Follow the [ReferIt3D official guide](https://referit3d.github.io/#dataset) to download `nr3d.csv`, `sr3d.csv`, `sr3d_train.csv`,  `sr3d_test.csv` and save them in the `data/referit3d` folder. 
 
 Follow the [ScanRefer official guide](https://daveredrum.github.io/ScanRefer/) to download the dataset and place them within the `data/scanrefer` folder.
+- We provide the ScanNet ground truth bounding boxes files that ScanRefer uses, i.e. the `_aligned_bbox.npy` files, under `data/scanrefer/scannet/scannet_data/`. They are obtained from the pre-processing steps of ScanRefer repo. 
 
 
 ### Generate Object Information
@@ -185,41 +188,62 @@ This define the class *CodeInterpreter* which inherits from the class *Dialogue*
 ### object_filter_gpt4.py
 Implements the object filter which filters out irrelevant object according to the description. -->
 
-## Evaluation
+## 2. Evaluation
 
 ### Quick Start
-Run the first 50 data records of *nr3d_test_sampled1000.csv* with config index 1:
+Run the first 10 data records in *nr3d_test_sampled1000.csv* with config index 1001 (gpt-4.1 model, with principles and code interpreter):
 
 ```bash
-python main.py --workspace_path /path/to/Transcribe3D/project/folder --scannet_data_root /path/to/ScanNet/Data/  --mode eval --dataset_type nr3d --conf_idx 1 --range 2 52
+python main.py --mode eval --dataset_type nr3d --conf_idx 1001 --range 2 12
 ```
 
-Remember to replace the paths.
-
 Note that `scannet_data_root` can be set to `/path/to/Transcribe3D/project/folder/data/scannet_object_info` as we already provide the ground-truth ScanNet bounding boxes. If you preprocess the data by yourself, it can be set to `scannet_download_path/scans/objects_info/`.
+
+### Other Examples
+
+```bash
+# first 10 in *sr3d_test_sampled1000.csv* with config index 1001 (gpt-4.1 model, with principles and code interpreter)
+python main.py --mode eval --dataset_type sr3d --conf_idx 1001 --range 2 12
+
+# first 10 in *ScanRefer_filtered_val_sampled1000.json* with config index 1000 (gpt-4.1 model, with principles and code interpreter, gt boxes)
+python main.py --mode eval --dataset_type scanrefer --conf_idx 1001 --range 0 10
+
+# first 10 in *nr3d_test_sampled1000.csv* with config index 1 (gpt-4 model, with principles and code interpreter)
+python main.py --mode eval --dataset_type nr3d --conf_idx 1 --range 2 12
+
+# first 500 in *sr3d_test_sampled1000.csv* with config index 1 (gpt-4 model, with principles and code interpreter)
+python main.py --mode eval --dataset_type sr3d --conf_idx 1 --range 2 502
+
+# first 300 in *nr3d_test_sampled1000.csv* with config index 0 (gpt-4 model, no principles, with code interpreter)
+python main.py --mode eval --dataset_type nr3d --conf_idx 0 --range 2 302
+```
+
+Please note that, gpt-4 is the model that we use to get the results reported in the paper; but it is much more expensive to call than the gpt-4.1 model.
+- `gpt-4.0`: $30/1M tokens for input, $30/1M tokens for output.
+- `gpt-4.1`: $2/1M tokens for input, $8/1M tokens for output.
 
 ### Modifying the Configuration
 
 - To run our model on different refering datasets, simply modify the `--dataset_type` setting to [sr3d/nr3d/scanrefer].
 
-- To select the evaluation range of the dataset, modify the `--range` setting. For Sr3D and Nr3D, which use .csv files, the minimum number is 2. For ScanRefer, which uses .json files, the minimum number is 0.
+- To select the evaluation range of the dataset, modify the `--range` setting. For Sr3D and Nr3D, which use .csv files, the minimum number is 2. For ScanRefer, which uses .json files, the minimum number is 0. Use `--eval_all` to evaluate all data records in the `.csv` or `.json` file.
 
 - For convenience, more configurations are placed in `config/config.py`. There are 3 dictionaries inside: confs_nr3d, confs_sr3d and confs_scanrefer. Each of them contains several configurations of that dataset. The meaning of different configurations can be understood from the variable names. Modify the `--conf_idx` setting to select a configuration. You can also add your own configurations.
 
-- More information can be found by running `python main.py -h`.
+- Use `--workspath_path`, `scannet_data_root`, and `--scanrefer_scannet_aligned_bbox_root` to overwrite the default values. More information can be found by running `python main.py -h`.
 
 ### Result Storage
 
 After running the evaluation with specific configurations, a folder will be created that contains configuration infomation with a name that starts with `eval_results_` under the `results` folder. Under this folder, there will be subfolders named after the start time of the experiment.
 
-## Analyzing Results
+## 3. Analyzing Results
 
 You might run one or more experiments of a evaluation configuration, and get some subfolders named according to the formatted time. The time(s) are used to analyze the results. An example timestamp looks like `2023-10-26-15-48-12`.
 
 Specify the formatted time(s) after the `--ft` setting:
 
 ```bash
-python main.py --workspace_path /path/to/Transcribe3D/project/folder/ --scannet_data_root /path/to/ScanNet/Data/  --mode result --dataset_type nr3d --conf_idx 1 --ft time1 time2
+python main.py --mode result --dataset_type nr3d --conf_idx 1 --ft time1 time2
 ```
 
 <!-- ## Self Correction
@@ -229,18 +253,18 @@ TODO
 This checks all the result dialogues given formatted time(s), self-corrects those wrong cases.
 
 ```bash
-python main.py --workspace_path /path/to/Transcribe3D/project/folder/ --scannet_data_root /path/to/ScanNet/Data/ --mode self_correct --dataset_type nr3d --conf_idx 1 --ft time1 time2
+python main.py --scannet_data_root /path/to/ScanNet/Data/ --mode self_correct --dataset_type nr3d --conf_idx 1 --ft time1 time2
 ``` -->
 
-## Check ScanRefer
+## 4. Check ScanRefer
 
 Check how many cases are provided with detected boxes that has 0.5 or higher IOU with the ground-truth box, which indicates the upper bound of performance on ScanRefer.
 
 ```bash
-python main.py --workspace_path /path/to/Transcribe3D/project/folder/ --scannet_data_root /path/to/ScanNet/Data/ --mode check_scanrefer --dataset_type scanrefer --conf_idx 1
+python main.py --mode check_scanrefer --dataset_type scanrefer --conf_idx 1
 ```
 
-## Finetuning
+## 5. Finetuning
 We provide scripts for finetuning on open-source LLMs (e.g., codeLlama, Llama2) within the `finetune` directory.
 
 ### Environment
