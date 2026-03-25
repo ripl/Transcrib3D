@@ -197,7 +197,7 @@ Run the first 10 data records in *nr3d_test_sampled1000.csv* with config index 1
 python main.py --mode eval --dataset_type nr3d --conf_idx 1001 --range 2 12
 ```
 
-Note that `scannet_data_root` can be set to `/path/to/Transcribe3D/project/folder/data/scannet_object_info` as we already provide the ground-truth ScanNet bounding boxes. If you preprocess the data by yourself, it can be set to `scannet_download_path/scans/objects_info/`.
+<!-- Note that `scannet_data_root` can be set to `/path/to/Transcribe3D/project/folder/data/scannet_object_info` as we already provide the ground-truth ScanNet bounding boxes. If you preprocess the data by yourself, it can be set to `scannet_download_path/scans/objects_info/`. -->
 
 ### Other Examples
 
